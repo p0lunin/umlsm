@@ -1,5 +1,8 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BatchSize};
-use umlsm::{StateMachine, InitialPseudostate, ftrans, State};
+use umlsm::{StateMachine};
+use umlsm::state::InitialPseudostate;
+use umlsm::transition::ftrans;
+use umlsm::state::State;
 
 struct MyState;
 
