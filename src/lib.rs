@@ -40,8 +40,8 @@ impl InitialPseudostate {
     }
 }
 
-pub trait Transition<Event> {
-    fn transition(&self, from: Box<dyn Vertex>, event: Event) -> Result<Box<dyn Vertex>, TransitionError<Event>>;
+pub trait Transition<Event, Answer> {
+    fn transition(&self, from: Box<dyn Vertex>, event: Event) -> Result<(Box<dyn Vertex>, Answer), TransitionError<Event>>;
     fn input_tid(&self) -> TypeId;
     fn output_tid(&self) -> TypeId;
 }
@@ -62,9 +62,9 @@ fn ftrans<F: Into<FuncTransition<F, Args>>, Args>(f: F) -> FuncTransition<F, Arg
     f.into()
 }
 
-impl<F, Input, Output, Event> From<F> for FuncTransition<F, (Input, Event)>
+impl<F, Input, Output, Event, Answer> From<F> for FuncTransition<F, (Input, Event)>
 where
-    F: Fn(Input, Event) -> Output,
+    F: Fn(Input, Event) -> (Output, Answer),
     Input: Vertex,
     Output: Vertex,
 {
@@ -73,18 +73,18 @@ where
     }
 }
 
-impl<F, Input, Output, Event> Transition<Event> for FuncTransition<F, (Input, Event)>
+impl<F, Input, Output, Answer, Event> Transition<Event, Answer> for FuncTransition<F, (Input, Event)>
 where
-    F: Fn(Input, Event) -> Output,
+    F: Fn(Input, Event) -> (Output, Answer),
     Input: Vertex,
     Output: Vertex,
 {
-    fn transition(&self, from: Box<dyn Vertex>, event: Event) -> Result<Box<dyn Vertex>, TransitionError<Event>> {
+    fn transition(&self, from: Box<dyn Vertex>, event: Event) -> Result<(Box<dyn Vertex>, Answer), TransitionError<Event>> {
         // TODO: remove Any::is check because it must be done by caller.
         let input = from.data().downcast::<Input>()
             .unwrap_or_else(|_| panic!("It is caller task"));
         let out = (self.0)(*input, event);
-        Ok(Box::new(out))
+        Ok((Box::new(out.0), out.1))
     }
 
     fn input_tid(&self) -> TypeId {
@@ -96,13 +96,13 @@ where
     }
 }
 
-pub struct StateMachine<Event> {
+pub struct StateMachine<Event, Answer> {
     state: Option<Box<dyn Vertex>>,
     vertexes: Vec<Box<dyn Vertex>>,
-    transitions: HashMap<TypeId, Vec<Box<dyn Transition<Event>>>>,
+    transitions: HashMap<TypeId, Vec<Box<dyn Transition<Event, Answer>>>>,
 }
 
-impl<Event> StateMachine<Event> {
+impl<Event, Answer> StateMachine<Event, Answer> {
     pub fn new() -> Self {
         let state = Some(InitialPseudostate::boxed());
         let vertexes = vec![InitialPseudostate::boxed()];
@@ -113,7 +113,7 @@ impl<Event> StateMachine<Event> {
         self.vertexes.push(vertex);
         self
     }
-    pub fn transition<T: Transition<Event> + 'static>(mut self, transition: T) -> Self {
+    pub fn transition<T: Transition<Event, Answer> + 'static>(mut self, transition: T) -> Self {
         let trans = Box::new(transition);
 
         self.transitions.entry(trans.input_tid())
@@ -121,16 +121,16 @@ impl<Event> StateMachine<Event> {
             .push(trans);
         self
     }
-    pub fn process(&mut self, mut event: Event) -> Result<(), StateMachineError> {
+    pub fn process(&mut self, mut event: Event) -> Result<Answer, StateMachineError> {
         let mut state = self.state.take().expect("It should be Some()");
         let state_tid = state.data_tid();
 
         let transitions = self.transitions.get(&state_tid).ok_or(StateMachineError::NoTransition)?;
         for transition in transitions {
             match transition.transition(state, event) {
-                Ok(new_state) => {
+                Ok((new_state, answer)) => {
                     self.state = Some(new_state);
-                    return Ok(());
+                    return Ok(answer);
                 }
                 Err(e) => {
                     let TransitionError { from: from1, event: event1, kind } = e;
@@ -163,10 +163,11 @@ mod tests {
         struct SomeState;
 
         let mut machine = StateMachine::new()
-            .transition(ftrans(|_: InitialPseudostate, _event: i32| {
-                State(SomeState)
+            .transition(ftrans(|_: InitialPseudostate, event: i32| {
+                (State(SomeState), event * 2)
             }));
 
-        assert_eq!(machine.process(1), Ok(()));
+        assert_eq!(machine.process(3), Ok(6));
+        assert_eq!(machine.process(3), Err(StateMachineError::NoTransition));
     }
 }
