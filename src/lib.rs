@@ -28,6 +28,7 @@ impl<T: Any> Vertex for State<T> {
     fn exit(&self) {}
     fn data(self: Box<Self>) -> Box<dyn Any> {
         unsafe {
+            // SAFETY: self if #[repr(transparent)]
             let b: Box<T> = std::mem::transmute(self);
             b
         }
