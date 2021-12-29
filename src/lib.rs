@@ -5,8 +5,8 @@ use downcast_rs::Downcast;
 use downcast_rs::impl_downcast;
 
 pub trait Vertex: Downcast {
-    fn entry(&self, _event: Box<dyn Any>);
-    fn exit(&self, _event: Box<dyn Any>);
+    fn entry(&self);
+    fn exit(&self);
     fn data(self: Box<Self>) -> Box<dyn Any>;
     fn data_tid(&self) -> TypeId { self.as_any().type_id() }
 }
@@ -15,8 +15,8 @@ impl_downcast!(Vertex);
 pub struct InitialPseudostate;
 
 impl Vertex for InitialPseudostate {
-    fn entry(&self, _event: Box<dyn Any>) {}
-    fn exit(&self, _event: Box<dyn Any>) {}
+    fn entry(&self) {}
+    fn exit(&self) {}
     fn data(self: Box<Self>) -> Box<dyn Any> { self }
 }
 
@@ -24,8 +24,8 @@ impl Vertex for InitialPseudostate {
 struct State<T>(T);
 
 impl<T: Any> Vertex for State<T> {
-    fn entry(&self, _event: Box<dyn Any>) {}
-    fn exit(&self, _event: Box<dyn Any>) {}
+    fn entry(&self) {}
+    fn exit(&self) {}
     fn data(self: Box<Self>) -> Box<dyn Any> {
         unsafe {
             let b: Box<T> = std::mem::transmute(self);
@@ -84,6 +84,7 @@ where
 
     fn transition(&self, from: Box<dyn Vertex>, event: Event) -> Result<(Box<dyn Vertex>, Answer), TransitionError<Event>> {
         // TODO: remove Any::is check because it must be done by caller.
+        from.exit();
         let input = from.data().downcast::<Input>()
             .unwrap_or_else(|_| panic!("It is caller task"));
         let out = (self.0)(*input, event);
@@ -132,6 +133,7 @@ impl<Event, Answer> StateMachine<Event, Answer> {
         for transition in transitions {
             match transition.transition(state, event) {
                 Ok((new_state, answer)) => {
+                    new_state.entry();
                     self.state = Some(new_state);
                     return Ok(answer);
                 }
