@@ -1,4 +1,4 @@
-use crate::transition::{TransitionError, TransitionErrorKind, Transition};
+use crate::transition::{TransitionError, TransitionErrorKind, Transition, EmptyTransition};
 use std::any::{TypeId, Any};
 use crate::Vertex;
 
@@ -20,14 +20,19 @@ pub struct GuardedTransition<Event, Tr> {
     transition: Tr,
 }
 
-impl<Event, Tr> GuardedTransition<Event, Tr> {
-    pub fn new(transition: Tr) -> Self {
-        GuardedTransition { guards: vec![], transition }
+impl<Event> GuardedTransition<Event, EmptyTransition> {
+    pub fn new() -> Self {
+        GuardedTransition { guards: vec![], transition: EmptyTransition }
     }
 
     pub fn guard<G: Guard<Event> + 'static>(mut self, guard: G) -> Self {
         self.guards.push(Box::new(guard));
         self
+    }
+
+    pub fn transition<NewTr>(self, transition: NewTr) -> GuardedTransition<Event, NewTr> {
+        let Self { guards, .. } = self;
+        GuardedTransition { guards, transition }
     }
 }
 

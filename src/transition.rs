@@ -24,6 +24,24 @@ pub enum TransitionErrorKind {
     GuardErr,
 }
 
+pub struct EmptyTransition;
+
+impl<Event> Transition<Event> for EmptyTransition {
+    type Answer = ();
+
+    fn transition(&self, _: &mut dyn Vertex, _: Event) -> Result<(Box<dyn Any>, Self::Answer), TransitionError<Event>> {
+        unreachable!("It seems you forgot to initialize transition for something.")
+    }
+
+    fn input_tid(&self) -> TypeId {
+        unreachable!("It seems you forgot to initialize transition for something.")
+    }
+
+    fn output_tid(&self) -> TypeId {
+        unreachable!("It seems you forgot to initialize transition for something.")
+    }
+}
+
 pub struct FuncTransition<F, Args>(F, PhantomData<Args>);
 
 pub fn ftrans<F: Into<FuncTransition<F, Args>>, Args>(f: F) -> FuncTransition<F, Args> {

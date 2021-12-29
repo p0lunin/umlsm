@@ -33,19 +33,17 @@ mod tests {
     fn test_guards() {
         let mut machine = StateMachine::new()
             .transition(
-                GuardedTransition::new(
-                    ftrans(|_: InitialPseudostate, event: i32| {
-                        (InitialPseudostate, event * 2)
-                    })
-                )
+                GuardedTransition::new()
                     .guard(|event: &i32| event % 2 == 0)
+                    .transition(ftrans(|_: InitialPseudostate, event: i32| {
+                        (InitialPseudostate, event * 2)
+                    }))
             ).transition(
-                GuardedTransition::new(
-                    ftrans(|_: InitialPseudostate, event: i32| {
-                        (InitialPseudostate, event * 3)
-                    })
-                )
+                GuardedTransition::new()
                     .guard(|event: &i32| event % 3 == 0)
+                    .transition(ftrans(|_: InitialPseudostate, event: i32| {
+                        (InitialPseudostate, event * 3)
+                    }))
             );
 
         assert_eq!(machine.process(2), Ok(2*2));
