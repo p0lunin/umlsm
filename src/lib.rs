@@ -40,8 +40,9 @@ impl InitialPseudostate {
     }
 }
 
-pub trait Transition<Event, Answer> {
-    fn transition(&self, from: Box<dyn Vertex>, event: Event) -> Result<(Box<dyn Vertex>, Answer), TransitionError<Event>>;
+pub trait Transition<Event> {
+    type Answer;
+    fn transition(&self, from: Box<dyn Vertex>, event: Event) -> Result<(Box<dyn Vertex>, Self::Answer), TransitionError<Event>>;
     fn input_tid(&self) -> TypeId;
     fn output_tid(&self) -> TypeId;
 }
@@ -73,12 +74,14 @@ where
     }
 }
 
-impl<F, Input, Output, Answer, Event> Transition<Event, Answer> for FuncTransition<F, (Input, Event)>
+impl<F, Input, Output, Answer, Event> Transition<Event> for FuncTransition<F, (Input, Event)>
 where
     F: Fn(Input, Event) -> (Output, Answer),
     Input: Vertex,
     Output: Vertex,
 {
+    type Answer = Answer;
+
     fn transition(&self, from: Box<dyn Vertex>, event: Event) -> Result<(Box<dyn Vertex>, Answer), TransitionError<Event>> {
         // TODO: remove Any::is check because it must be done by caller.
         let input = from.data().downcast::<Input>()
@@ -99,7 +102,7 @@ where
 pub struct StateMachine<Event, Answer> {
     state: Option<Box<dyn Vertex>>,
     vertexes: Vec<Box<dyn Vertex>>,
-    transitions: HashMap<TypeId, Vec<Box<dyn Transition<Event, Answer>>>>,
+    transitions: HashMap<TypeId, Vec<Box<dyn Transition<Event, Answer = Answer>>>>,
 }
 
 impl<Event, Answer> StateMachine<Event, Answer> {
@@ -113,7 +116,7 @@ impl<Event, Answer> StateMachine<Event, Answer> {
         self.vertexes.push(vertex);
         self
     }
-    pub fn transition<T: Transition<Event, Answer> + 'static>(mut self, transition: T) -> Self {
+    pub fn transition<T: Transition<Event, Answer = Answer> + 'static>(mut self, transition: T) -> Self {
         let trans = Box::new(transition);
 
         self.transitions.entry(trans.input_tid())
