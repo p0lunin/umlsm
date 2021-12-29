@@ -15,7 +15,7 @@ impl_downcast!(Vertex);
 
 pub struct InitialPseudostate;
 
-struct State<T, Entry, Exit> {
+pub struct State<T, Entry, Exit> {
     data: Option<Box<T>>,
     entry: Entry,
     exit: Exit,
@@ -90,7 +90,7 @@ pub enum TransitionErrorKind {
 
 pub struct FuncTransition<F, Args>(F, PhantomData<Args>);
 
-fn ftrans<F: Into<FuncTransition<F, Args>>, Args>(f: F) -> FuncTransition<F, Args> {
+pub fn ftrans<F: Into<FuncTransition<F, Args>>, Args>(f: F) -> FuncTransition<F, Args> {
     f.into()
 }
 
