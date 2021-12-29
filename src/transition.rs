@@ -69,7 +69,6 @@ where
 
     fn transition(&self, from: &mut dyn Vertex, event: Event) -> Result<(Box<dyn Any>, Answer), TransitionError<Event>> {
         from.exit();
-        // TODO: remove Any::is check because it must be done by caller.
         let input = from.get_data().downcast::<Input>()
             .unwrap_or_else(|_| panic!("It is caller task"));
         let out = (self.0)(*input, event);
