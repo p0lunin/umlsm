@@ -35,7 +35,7 @@ impl<Event, Answer> StateMachine<Event, Answer> {
         let state = self.vertexes[self.state].as_mut();
         let state_tid = state.data_tid();
 
-        let transitions = self.transitions.get(&state_tid).ok_or(StateMachineError::NoTransition)?;
+        let transitions = self.transitions.get(&state_tid).ok_or(StateMachineError::NoTransitions)?;
         for transition in transitions {
             match transition.transition(state, event) {
                 Ok((new_state, answer)) => {
@@ -66,5 +66,6 @@ impl<Event, Answer> StateMachine<Event, Answer> {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum StateMachineError {
+    NoTransitions,
     NoTransition,
 }

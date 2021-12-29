@@ -26,7 +26,7 @@ mod tests {
             }));
 
         assert_eq!(machine.process(3), Ok(6));
-        assert_eq!(machine.process(3), Err(StateMachineError::NoTransition));
+        assert_eq!(machine.process(3), Err(StateMachineError::NoTransitions));
     }
 
     #[test]
