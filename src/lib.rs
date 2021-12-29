@@ -13,6 +13,19 @@ pub trait Vertex: Downcast {
 }
 impl_downcast!(Vertex);
 
+pub trait Guard<Event> {
+    fn check(&self, input: &Event) -> bool;
+}
+
+impl<F, Event> Guard<Event> for F
+where
+    F: Fn(&Event) -> bool
+{
+    fn check(&self, input: &Event) -> bool {
+        self(input)
+    }
+}
+
 pub struct InitialPseudostate;
 
 pub struct State<T, Entry, Exit> {
@@ -84,11 +97,57 @@ pub struct TransitionError<Event> {
     kind: TransitionErrorKind,
 }
 
+impl<Event> TransitionError<Event> {
+    pub fn new(event: Event, kind: TransitionErrorKind) -> Self {
+        TransitionError { event, kind }
+    }
+}
+
 pub enum TransitionErrorKind {
     GuardErr,
 }
 
 pub struct FuncTransition<F, Args>(F, PhantomData<Args>);
+
+pub struct GuardedTransition<Event, Tr> {
+    guards: Vec<Box<dyn Guard<Event>>>,
+    transition: Tr,
+}
+
+impl<Event, Tr> GuardedTransition<Event, Tr> {
+    pub fn new(transition: Tr) -> Self {
+        GuardedTransition { guards: vec![], transition }
+    }
+
+    pub fn guard<G: Guard<Event> + 'static>(mut self, guard: G) -> Self {
+        self.guards.push(Box::new(guard));
+        self
+    }
+}
+
+impl<Event, Tr> Transition<Event> for GuardedTransition<Event, Tr>
+where
+    Tr: Transition<Event>,
+{
+    type Answer = Tr::Answer;
+
+    fn transition(&self, from: &mut dyn Vertex, event: Event) -> Result<(Box<dyn Any>, Self::Answer), TransitionError<Event>> {
+        match self.guards.iter().map(|g| g.check(&event)).all(|x| x) {
+            true => {
+                self.transition.transition(from, event)
+            }
+            false => {
+                Err(TransitionError::new(event, TransitionErrorKind::GuardErr))
+            }
+        }
+    }
+    fn input_tid(&self) -> TypeId {
+        self.transition.input_tid()
+    }
+    fn output_tid(&self) -> TypeId {
+        self.transition.output_tid()
+    }
+}
 
 pub fn ftrans<F: Into<FuncTransition<F, Args>>, Args>(f: F) -> FuncTransition<F, Args> {
     f.into()
@@ -211,5 +270,29 @@ mod tests {
 
         assert_eq!(machine.process(3), Ok(6));
         assert_eq!(machine.process(3), Err(StateMachineError::NoTransition));
+    }
+
+    #[test]
+    fn test_guards() {
+        let mut machine = StateMachine::new()
+            .transition(
+                GuardedTransition::new(
+                    ftrans(|_: InitialPseudostate, event: i32| {
+                        (InitialPseudostate, event * 2)
+                    })
+                )
+                    .guard(|event: &i32| event % 2 == 0)
+            ).transition(
+                GuardedTransition::new(
+                    ftrans(|_: InitialPseudostate, event: i32| {
+                        (InitialPseudostate, event * 3)
+                    })
+                )
+                    .guard(|event: &i32| event % 3 == 0)
+            );
+
+        assert_eq!(machine.process(2), Ok(2*2));
+        assert_eq!(machine.process(3), Ok(3*3));
+        assert_eq!(machine.process(6), Ok(6*2));
     }
 }
