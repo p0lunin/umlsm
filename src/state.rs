@@ -13,11 +13,19 @@ fn do_nothing<T>(_: &T) {}
 
 impl<T> State<T, (), ()> {
     pub fn new(data: T) -> State<T, impl Fn(&T), impl Fn(&T)> {
-        State { data: Some(Box::new(data)), entry: do_nothing, exit: do_nothing }
+        State {
+            data: Some(Box::new(data)),
+            entry: do_nothing,
+            exit: do_nothing,
+        }
     }
 
     pub fn empty<T1>() -> State<T1, impl Fn(&T), impl Fn(&T)> {
-        State { data: None, entry: do_nothing, exit: do_nothing }
+        State {
+            data: None,
+            entry: do_nothing,
+            exit: do_nothing,
+        }
     }
 }
 
@@ -49,13 +57,33 @@ where
     Entry: Fn(&T) + 'static,
     Exit: Fn(&T) + 'static,
 {
-    fn entry(&self) { (self.entry)(&self.data.as_ref().expect("It must guaranteed by the caller").as_ref()); }
-    fn exit(&self) { (self.exit)(&self.data.as_ref().expect("It must guaranteed by the caller").as_ref()); }
+    fn entry(&self) {
+        (self.entry)(
+            &self
+                .data
+                .as_ref()
+                .expect("It must guaranteed by the caller")
+                .as_ref(),
+        );
+    }
+    fn exit(&self) {
+        (self.exit)(
+            &self
+                .data
+                .as_ref()
+                .expect("It must guaranteed by the caller")
+                .as_ref(),
+        );
+    }
     fn get_data(&mut self) -> Box<dyn Any> {
-        self.data.take().expect("This method must be called only once.")
+        self.data
+            .take()
+            .expect("This method must be called only once.")
     }
     fn set_data(&mut self, data: Box<dyn Any>) {
         self.data = Some(data.downcast().expect("It must guaranteed by the caller"))
     }
-    fn data_tid(&self) -> TypeId { TypeId::of::<T>() }
+    fn data_tid(&self) -> TypeId {
+        TypeId::of::<T>()
+    }
 }

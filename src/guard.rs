@@ -1,6 +1,6 @@
-use crate::transition::{TransitionError, TransitionErrorKind, Transition, EmptyTransition};
-use std::any::{TypeId, Any};
+use crate::transition::{EmptyTransition, Transition, TransitionError, TransitionErrorKind};
 use crate::Vertex;
+use std::any::{Any, TypeId};
 
 pub trait Guard<Event> {
     fn check(&self, input: &Event) -> bool;
@@ -8,7 +8,7 @@ pub trait Guard<Event> {
 
 impl<F, Event> Guard<Event> for F
 where
-    F: Fn(&Event) -> bool
+    F: Fn(&Event) -> bool,
 {
     fn check(&self, input: &Event) -> bool {
         self(input)
@@ -22,7 +22,10 @@ pub struct GuardedTransition<Event, Tr> {
 
 impl<Event> GuardedTransition<Event, EmptyTransition> {
     pub fn new() -> Self {
-        GuardedTransition { guards: vec![], transition: EmptyTransition }
+        GuardedTransition {
+            guards: vec![],
+            transition: EmptyTransition,
+        }
     }
 
     pub fn guard<G: Guard<Event> + 'static>(mut self, guard: G) -> Self {
@@ -42,20 +45,20 @@ where
 {
     type Answer = Tr::Answer;
 
-    fn transition(&self, from: &mut dyn Vertex, event: Event) -> Result<(Box<dyn Any>, Self::Answer), TransitionError<Event>> {
+    fn transition(
+        &self,
+        from: &mut dyn Vertex,
+        event: Event,
+    ) -> Result<(Box<dyn Any>, Self::Answer), TransitionError<Event>> {
         match self.guards.iter().map(|g| g.check(&event)).all(|x| x) {
-            true => {
-                self.transition.transition(from, event)
-            }
-            false => {
-                Err(TransitionError::new(event, TransitionErrorKind::GuardErr))
-            }
+            true => self.transition.transition(from, event),
+            false => Err(TransitionError::new(event, TransitionErrorKind::GuardErr)),
         }
     }
     fn input_tid(&self) -> TypeId {
         self.transition.input_tid()
     }
-    fn output_tid(&self) -> TypeId {
-        self.transition.output_tid()
+    fn output_tids(&self) -> Vec<TypeId> {
+        self.transition.output_tids()
     }
 }
