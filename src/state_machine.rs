@@ -1,18 +1,24 @@
-use crate::state::InitialPseudostate;
 use crate::state::SimpleVertex;
+use crate::state::{Cast, InitialPseudostate};
 use crate::transition::{Transition, TransitionError, TransitionErrorKind, TransitionOut};
 use crate::vertex::Vertex;
-use std::any::TypeId;
+use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
-pub struct StateMachine<Event, Answer> {
+pub struct StateMachine<Event, Answer, State: ?Sized = dyn Any> {
     state: usize,
-    vertexes: Vec<Box<dyn Vertex>>,
-    transitions: HashMap<TypeId, Vec<Box<dyn Transition<Event, Answer = Answer>>>>,
+    vertexes: Vec<Box<dyn Vertex<State>>>,
+    transitions: HashMap<TypeId, Vec<Box<dyn Transition<Event, State, Answer = Answer>>>>,
 }
 
-impl<Event, Answer> StateMachine<Event, Answer> {
-    pub fn new() -> Self {
+impl<Event, Answer, State> StateMachine<Event, Answer, State>
+where
+    State: ?Sized + 'static,
+{
+    pub fn new() -> Self
+    where
+        State: Cast<InitialPseudostate>,
+    {
         let vertexes = vec![Box::new(SimpleVertex::with_data(InitialPseudostate)) as _];
         let transitions = HashMap::new();
         StateMachine {
@@ -21,7 +27,7 @@ impl<Event, Answer> StateMachine<Event, Answer> {
             transitions,
         }
     }
-    pub fn with_default_state(mut vertex: Box<dyn Vertex>) -> Self {
+    pub fn with_default_state(mut vertex: Box<dyn Vertex<State>>) -> Self {
         let data = vertex.get_data();
         vertex.set_data(data);
 
@@ -33,11 +39,11 @@ impl<Event, Answer> StateMachine<Event, Answer> {
             transitions,
         }
     }
-    pub fn register_vertex(mut self, vertex: Box<dyn Vertex>) -> Self {
+    pub fn register_vertex(mut self, vertex: Box<dyn Vertex<State>>) -> Self {
         self.vertexes.push(vertex);
         self
     }
-    pub fn transition<T: Transition<Event, Answer = Answer> + 'static>(
+    pub fn transition<T: Transition<Event, State, Answer = Answer> + 'static>(
         mut self,
         transition: T,
     ) -> Self {
@@ -99,6 +105,11 @@ impl<Event, Answer> StateMachine<Event, Answer> {
 
         Err(SmError::NoTransitionSatisfyingEvent(event))
     }
+
+    pub fn current_state(&self) -> &State {
+        self.vertexes[self.state].get_data_as_ref()
+    }
+
     fn find_vertex_by_data_tid(&self, tid: TypeId) -> Option<usize> {
         self.vertexes
             .iter()

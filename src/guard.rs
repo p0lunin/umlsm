@@ -41,17 +41,17 @@ impl<Event> GuardedTransition<Event, EmptyTransition> {
     }
 }
 
-impl<Event, Tr> Transition<Event> for GuardedTransition<Event, Tr>
+impl<Event, Tr, State: ?Sized> Transition<Event, State> for GuardedTransition<Event, Tr>
 where
-    Tr: Transition<Event>,
+    Tr: Transition<Event, State>,
 {
     type Answer = Tr::Answer;
 
     fn transition(
         &self,
-        from: &mut dyn Vertex,
+        from: &mut dyn Vertex<State>,
         event: Event,
-    ) -> Result<TransitionOut<Self::Answer>, TransitionError<Event>> {
+    ) -> Result<TransitionOut<State, Self::Answer>, TransitionError<Event>> {
         match self.guards.iter().map(|g| g.check(&event)).all(|x| x) {
             true => self.transition.transition(from, event),
             false => Err(TransitionError::new(event, TransitionErrorKind::GuardErr)),

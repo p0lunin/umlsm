@@ -1,6 +1,40 @@
 use crate::vertex::Vertex;
 use std::any::{Any, TypeId};
 
+pub trait Cast<From: 'static>: Any {
+    fn upcast(from: Box<From>) -> Box<Self>;
+    fn upcast_ref(from: &From) -> &Self;
+    fn concrete_tid(&self) -> TypeId;
+    fn downcast(self: Box<Self>) -> Box<From> {
+        if self.concrete_tid() == TypeId::of::<From>() {
+            unsafe {
+                let raw: *mut Self = Box::<Self>::into_raw(self);
+                Box::from_raw(raw as *mut From)
+            }
+        } else {
+            panic!("Must be guaranteed by the caller.")
+        }
+    }
+}
+
+impl<T: Any> Cast<T> for dyn Any {
+    fn upcast(from: Box<T>) -> Box<Self> {
+        from
+    }
+
+    fn upcast_ref(from: &T) -> &Self {
+        from
+    }
+
+    fn concrete_tid(&self) -> TypeId {
+        self.type_id()
+    }
+
+    fn downcast(self: Box<Self>) -> Box<T> {
+        self.downcast().expect("Must be guaranteed by caller.")
+    }
+}
+
 pub struct InitialPseudostate;
 
 pub struct SimpleVertex<T> {
@@ -47,16 +81,17 @@ impl<T> SimpleVertex<T> {
     }
 }
 
-impl<T: 'static> SimpleVertex<T>
-where
-    Self: Vertex,
-{
-    pub fn boxed(self) -> Box<dyn Vertex> {
+impl<T: 'static> SimpleVertex<T> {
+    pub fn boxed<State: Cast<T> + ?Sized>(self) -> Box<dyn Vertex<State>> {
         Box::new(self)
     }
 }
 
-impl<T: Any> Vertex for SimpleVertex<T> {
+impl<T, State> Vertex<State> for SimpleVertex<T>
+where
+    T: 'static,
+    State: Cast<T> + ?Sized,
+{
     fn entry(&self) {
         (self.entry)(
             &self
@@ -75,13 +110,22 @@ impl<T: Any> Vertex for SimpleVertex<T> {
                 .as_ref(),
         );
     }
-    fn get_data(&mut self) -> Box<dyn Any> {
+    fn get_data(&mut self) -> Box<State> {
         self.data
             .take()
+            .map(|x| State::upcast(x))
             .expect("This method must be called only once.")
     }
-    fn set_data(&mut self, data: Box<dyn Any>) {
-        self.data = Some(data.downcast().expect("It must guaranteed by the caller"))
+
+    fn get_data_as_ref(&self) -> &State {
+        self.data
+            .as_ref()
+            .map(|x| State::upcast_ref(x))
+            .expect("This method must be called only once.")
+    }
+
+    fn set_data(&mut self, data: Box<State>) {
+        self.data = Some(data.downcast())
     }
     fn data_tid(&self) -> TypeId {
         TypeId::of::<T>()

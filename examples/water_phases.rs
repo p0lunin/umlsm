@@ -1,7 +1,9 @@
 // https://www.uml-diagrams.org/examples/water-phase-uml-state-machine-diagram-example.html
 
+use std::any::{Any, TypeId};
+use std::fmt::Debug;
 use umlsm::guard::GuardedTransition;
-use umlsm::state::SimpleVertex;
+use umlsm::state::{Cast, SimpleVertex};
 use umlsm::transition::{ftrans, Transition};
 use umlsm::StateMachine;
 
@@ -28,8 +30,33 @@ enum Event {
     Sublimation,
 }
 
-fn create_sm() -> StateMachine<Event, ()> {
-    StateMachine::with_default_state(SimpleVertex::with_data(LiquidWater).boxed())
+trait MyState: Debug + Any {
+    fn tid(&self) -> TypeId;
+}
+impl<T: Debug + Any + 'static> MyState for T {
+    fn tid(&self) -> TypeId {
+        TypeId::of::<T>()
+    }
+}
+
+impl<T: Debug + Any> Cast<T> for dyn MyState {
+    fn upcast(from: Box<T>) -> Box<Self> {
+        from
+    }
+
+    fn upcast_ref(from: &T) -> &Self {
+        from
+    }
+
+    fn concrete_tid(&self) -> TypeId {
+        self.tid()
+    }
+}
+
+type Sm = StateMachine<Event, (), dyn MyState>;
+
+fn create_sm() -> Sm {
+    Sm::with_default_state(SimpleVertex::with_data(LiquidWater).boxed())
         .register_vertex(SimpleVertex::with_data(WaterVapor).boxed())
         .register_vertex(SimpleVertex::with_data(Plasma).boxed())
         .register_vertex(SimpleVertex::with_data(IceOrFrost).boxed())
@@ -43,11 +70,11 @@ fn create_sm() -> StateMachine<Event, ()> {
         .transition(switch_state(IceOrFrost, Event::Sublimation, WaterVapor))
 }
 
-fn switch_state<P: 'static, N: Clone + 'static>(
+fn switch_state<P: Debug + 'static, N: Debug + Clone + 'static>(
     _from: P,
     event: Event,
     to: N,
-) -> impl Transition<Event, Answer = ()> {
+) -> impl Transition<Event, dyn MyState, Answer = ()> {
     GuardedTransition::new()
         .guard(move |e: &Event| *e == event)
         .transition(ftrans(move |_prev: P, _event| (to.clone(), ())))
@@ -58,11 +85,11 @@ fn main() {
     repl(sm)
 }
 
-fn repl(mut sm: StateMachine<Event, ()>) -> ! {
+fn repl(mut sm: Sm) -> ! {
     use std::io::Write;
 
     loop {
-        //println!("|| Current state is {:?}", state);
+        println!("|| Current state is {:?}", sm.current_state());
         print!(">> ");
         std::io::stdout().flush().unwrap();
 
