@@ -1,6 +1,8 @@
-use crate::transition::{EmptyTransition, Transition, TransitionError, TransitionErrorKind};
+use crate::transition::{
+    EmptyTransition, Transition, TransitionError, TransitionErrorKind, TransitionOut,
+};
 use crate::Vertex;
-use std::any::{Any, TypeId};
+use std::any::TypeId;
 
 pub trait Guard<Event> {
     fn check(&self, input: &Event) -> bool;
@@ -49,7 +51,7 @@ where
         &self,
         from: &mut dyn Vertex,
         event: Event,
-    ) -> Result<(Box<dyn Any>, Self::Answer), TransitionError<Event>> {
+    ) -> Result<TransitionOut<Self::Answer>, TransitionError<Event>> {
         match self.guards.iter().map(|g| g.check(&event)).all(|x| x) {
             true => self.transition.transition(from, event),
             false => Err(TransitionError::new(event, TransitionErrorKind::GuardErr)),
@@ -58,7 +60,7 @@ where
     fn input_tid(&self) -> TypeId {
         self.transition.input_tid()
     }
-    fn output_tids(&self) -> Vec<TypeId> {
-        self.transition.output_tids()
+    fn output_tid(&self) -> TypeId {
+        self.transition.output_tid()
     }
 }

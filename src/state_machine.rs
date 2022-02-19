@@ -1,6 +1,6 @@
 use crate::state::InitialPseudostate;
-use crate::state::State;
-use crate::transition::{Transition, TransitionError, TransitionErrorKind};
+use crate::state::SimpleVertex;
+use crate::transition::{Transition, TransitionError, TransitionErrorKind, TransitionOut};
 use crate::vertex::Vertex;
 use std::any::TypeId;
 use std::collections::HashMap;
@@ -13,7 +13,19 @@ pub struct StateMachine<Event, Answer> {
 
 impl<Event, Answer> StateMachine<Event, Answer> {
     pub fn new() -> Self {
-        let vertexes = vec![Box::new(State::new(InitialPseudostate)) as _];
+        let vertexes = vec![Box::new(SimpleVertex::with_data(InitialPseudostate)) as _];
+        let transitions = HashMap::new();
+        StateMachine {
+            state: 0,
+            vertexes,
+            transitions,
+        }
+    }
+    pub fn with_default_state(mut vertex: Box<dyn Vertex>) -> Self {
+        let data = vertex.get_data();
+        vertex.set_data(data);
+
+        let vertexes = vec![vertex];
         let transitions = HashMap::new();
         StateMachine {
             state: 0,
@@ -34,12 +46,11 @@ impl<Event, Answer> StateMachine<Event, Answer> {
                 .is_some(),
             "Not found input vertex!"
         );
-        for tid in transition.output_tids() {
-            assert!(
-                self.find_vertex_by_data_tid(tid).is_some(),
-                "Not found one of output vertices!"
-            );
-        }
+        assert!(
+            self.find_vertex_by_data_tid(transition.output_tid())
+                .is_some(),
+            "Not found output vertex!"
+        );
 
         let trans = Box::new(transition);
         self.transitions
@@ -48,17 +59,21 @@ impl<Event, Answer> StateMachine<Event, Answer> {
             .push(trans);
         self
     }
-    pub fn process(&mut self, mut event: Event) -> Result<Answer, StateMachineError> {
+
+    pub fn process(&mut self, mut event: Event) -> Result<Answer, SmError<Event>> {
         let state = self.vertexes[self.state].as_mut();
         let state_tid = state.data_tid();
 
-        let transitions = self
-            .transitions
-            .get(&state_tid)
-            .ok_or(StateMachineError::NoTransitions)?;
+        let transitions = match self.transitions.get(&state_tid) {
+            Some(ts) => ts,
+            None => return Err(SmError::NoTransitionsFromThisVertex(event)),
+        };
         for transition in transitions {
             match transition.transition(state, event) {
-                Ok((new_state, answer)) => {
+                Ok(TransitionOut {
+                    state: new_state,
+                    answer,
+                }) => {
                     let new_vertex = self
                         .find_vertex_by_data_tid(new_state.as_ref().type_id())
                         .expect("It should be checked in the `transition` function");
@@ -82,7 +97,7 @@ impl<Event, Answer> StateMachine<Event, Answer> {
             }
         }
 
-        Err(StateMachineError::NoTransition)
+        Err(SmError::NoTransitionSatisfyingEvent(event))
     }
     fn find_vertex_by_data_tid(&self, tid: TypeId) -> Option<usize> {
         self.vertexes
@@ -94,7 +109,7 @@ impl<Event, Answer> StateMachine<Event, Answer> {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum StateMachineError {
-    NoTransitions,
-    NoTransition,
+pub enum SmError<Event> {
+    NoTransitionsFromThisVertex(Event),
+    NoTransitionSatisfyingEvent(Event),
 }

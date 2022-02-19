@@ -3,47 +3,51 @@ use std::any::{Any, TypeId};
 
 pub struct InitialPseudostate;
 
-pub struct State<T, Entry, Exit> {
+pub struct SimpleVertex<T> {
     data: Option<Box<T>>,
-    entry: Entry,
-    exit: Exit,
+    entry: Box<dyn for<'a> Fn(&'a T)>,
+    exit: Box<dyn for<'a> Fn(&'a T)>,
 }
 
 fn do_nothing<T>(_: &T) {}
 
-impl<T> State<T, (), ()> {
-    pub fn new(data: T) -> State<T, impl Fn(&T), impl Fn(&T)> {
-        State {
-            data: Some(Box::new(data)),
-            entry: do_nothing,
-            exit: do_nothing,
-        }
-    }
-
-    pub fn empty<T1>() -> State<T1, impl Fn(&T), impl Fn(&T)> {
-        State {
+impl<T: 'static> SimpleVertex<T> {
+    pub fn new() -> SimpleVertex<T> {
+        SimpleVertex {
             data: None,
-            entry: do_nothing,
-            exit: do_nothing,
+            entry: Box::new(do_nothing),
+            exit: Box::new(do_nothing),
+        }
+    }
+
+    pub fn with_data(data: T) -> SimpleVertex<T> {
+        SimpleVertex {
+            data: Some(Box::new(data)),
+            entry: Box::new(do_nothing),
+            exit: Box::new(do_nothing),
         }
     }
 }
 
-impl<T, Entry1, Exit> State<T, Entry1, Exit> {
-    pub fn entry<Entry>(self, entry: Entry) -> State<T, Entry, Exit> {
-        let State { data, exit, .. } = self;
-        State { entry, data, exit }
+impl<T> SimpleVertex<T> {
+    pub fn with_entry(self, entry: impl for<'a> Fn(&'a T) + 'static) -> SimpleVertex<T> {
+        SimpleVertex {
+            entry: Box::new(entry),
+            ..self
+        }
     }
 }
 
-impl<T, Entry, Exit1> State<T, Entry, Exit1> {
-    pub fn exit<Exit>(self, exit: Exit) -> State<T, Entry, Exit> {
-        let State { data, entry, .. } = self;
-        State { exit, data, entry }
+impl<T> SimpleVertex<T> {
+    pub fn with_exit(self, exit: impl for<'a> Fn(&'a T) + 'static) -> SimpleVertex<T> {
+        SimpleVertex {
+            exit: Box::new(exit),
+            ..self
+        }
     }
 }
 
-impl<T: 'static, Entry: 'static, Exit: 'static> State<T, Entry, Exit>
+impl<T: 'static> SimpleVertex<T>
 where
     Self: Vertex,
 {
@@ -52,17 +56,13 @@ where
     }
 }
 
-impl<T: Any, Entry, Exit> Vertex for State<T, Entry, Exit>
-where
-    Entry: Fn(&T) + 'static,
-    Exit: Fn(&T) + 'static,
-{
+impl<T: Any> Vertex for SimpleVertex<T> {
     fn entry(&self) {
         (self.entry)(
             &self
                 .data
                 .as_ref()
-                .expect("It must guaranteed by the caller")
+                .expect("It must be guaranteed by the caller")
                 .as_ref(),
         );
     }
@@ -71,7 +71,7 @@ where
             &self
                 .data
                 .as_ref()
-                .expect("It must guaranteed by the caller")
+                .expect("It must be guaranteed by the caller")
                 .as_ref(),
         );
     }
