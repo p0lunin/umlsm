@@ -2,10 +2,9 @@
 
 use std::any::{Any, TypeId};
 use std::fmt::Debug;
-use umlsm::guard::GuardedTransition;
 use umlsm::state::{Cast, SimpleVertex};
 use umlsm::transition::{ftrans, Transition};
-use umlsm::StateMachine;
+use umlsm::{Event, StateMachine};
 
 // States
 #[derive(Debug, Clone)]
@@ -18,17 +17,22 @@ struct Plasma;
 struct IceOrFrost;
 
 // Events
-#[derive(Debug, PartialEq)]
-enum Event {
-    Ionize,
-    Deionize,
-    Vaporize,
-    Condensate,
-    Melt,
-    Freeze,
-    Deposition,
-    Sublimation,
-}
+#[derive(Debug)]
+struct Ionize;
+#[derive(Debug)]
+struct Deionize;
+#[derive(Debug)]
+struct Vaporize;
+#[derive(Debug)]
+struct Condensate;
+#[derive(Debug)]
+struct Melt;
+#[derive(Debug)]
+struct Freeze;
+#[derive(Debug)]
+struct Deposition;
+#[derive(Debug)]
+struct Sublimation;
 
 trait MyState: Debug + Any {
     fn tid(&self) -> TypeId;
@@ -53,31 +57,30 @@ impl<T: Debug + Any> Cast<T> for dyn MyState {
     }
 }
 
-type Sm = StateMachine<Event, (), dyn MyState>;
+type Sm = StateMachine<(), dyn MyState>;
 
 fn create_sm() -> Sm {
     Sm::with_default_state(SimpleVertex::with_data(LiquidWater).boxed())
         .register_vertex(SimpleVertex::with_data(WaterVapor).boxed())
         .register_vertex(SimpleVertex::with_data(Plasma).boxed())
         .register_vertex(SimpleVertex::with_data(IceOrFrost).boxed())
-        .transition(switch_state(WaterVapor, Event::Ionize, Plasma))
-        .transition(switch_state(Plasma, Event::Deionize, WaterVapor))
-        .transition(switch_state(LiquidWater, Event::Vaporize, WaterVapor))
-        .transition(switch_state(WaterVapor, Event::Condensate, LiquidWater))
-        .transition(switch_state(IceOrFrost, Event::Melt, LiquidWater))
-        .transition(switch_state(LiquidWater, Event::Freeze, IceOrFrost))
-        .transition(switch_state(WaterVapor, Event::Deposition, IceOrFrost))
-        .transition(switch_state(IceOrFrost, Event::Sublimation, WaterVapor))
+        .transition(switch_state(WaterVapor, Ionize, Plasma))
+        .transition(switch_state(Plasma, Deionize, WaterVapor))
+        .transition(switch_state(LiquidWater, Vaporize, WaterVapor))
+        .transition(switch_state(WaterVapor, Condensate, LiquidWater))
+        .transition(switch_state(IceOrFrost, Melt, LiquidWater))
+        .transition(switch_state(LiquidWater, Freeze, IceOrFrost))
+        .transition(switch_state(WaterVapor, Deposition, IceOrFrost))
+        .transition(switch_state(IceOrFrost, Sublimation, WaterVapor))
 }
 
-fn switch_state<P: Debug + 'static, N: Debug + Clone + 'static>(
-    _from: P,
-    event: Event,
-    to: N,
-) -> impl Transition<Event, dyn MyState, Answer = ()> {
-    GuardedTransition::new()
-        .guard(move |e: &Event| *e == event)
-        .transition(ftrans(move |_prev: P, _event| (to.clone(), ())))
+fn switch_state<P, E, N>(_from: P, _event: E, to: N) -> impl Transition<dyn MyState, Answer = ()>
+where
+    P: Debug + 'static,
+    E: 'static,
+    N: Debug + Clone + 'static,
+{
+    ftrans(move |_prev: P, _event: E| (to.clone(), ()))
 }
 
 fn main() {
@@ -98,21 +101,21 @@ fn repl(mut sm: Sm) -> ! {
 
         let str = cmd.trim();
         let event = match str {
-            "ionize" => Event::Ionize,
-            "deionize" => Event::Deionize,
-            "vaporize" => Event::Vaporize,
-            "condensate" => Event::Condensate,
-            "melt" => Event::Melt,
-            "freeze" => Event::Freeze,
-            "deposition" => Event::Deposition,
-            "sublimation" => Event::Sublimation,
+            "ionize" => Box::new(Ionize) as Event,
+            "deionize" => Box::new(Deionize),
+            "vaporize" => Box::new(Vaporize),
+            "condensate" => Box::new(Condensate),
+            "melt" => Box::new(Melt),
+            "freeze" => Box::new(Freeze),
+            "deposition" => Box::new(Deposition),
+            "sublimation" => Box::new(Sublimation),
             _ => {
                 println!("Unknown event.");
                 continue;
             }
         };
 
-        match sm.process(event) {
+        match sm.process_boxed(event) {
             Ok(_) => {
                 println!("Success transition!");
             }

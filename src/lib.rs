@@ -1,6 +1,8 @@
+pub use event::Event;
 pub use state_machine::{SmError, StateMachine};
 pub use vertex::Vertex;
 
+mod event;
 pub mod guard;
 pub mod state;
 mod state_machine;

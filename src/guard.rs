@@ -1,8 +1,9 @@
+use crate::event::Event;
 use crate::transition::{
     EmptyTransition, Transition, TransitionError, TransitionErrorKind, TransitionOut,
 };
 use crate::Vertex;
-use std::any::TypeId;
+use std::any::{Any, TypeId};
 
 pub trait Guard<Event> {
     fn check(&self, input: &Event) -> bool;
@@ -17,8 +18,8 @@ where
     }
 }
 
-pub struct GuardedTransition<Event, Tr> {
-    guards: Vec<Box<dyn Guard<Event>>>,
+pub struct GuardedTransition<FEvent, Tr> {
+    guards: Vec<Box<dyn Guard<FEvent>>>,
     transition: Tr,
 }
 
@@ -41,9 +42,10 @@ impl<Event> GuardedTransition<Event, EmptyTransition> {
     }
 }
 
-impl<Event, Tr, State: ?Sized> Transition<Event, State> for GuardedTransition<Event, Tr>
+impl<FEvent, Tr, State: ?Sized> Transition<State> for GuardedTransition<FEvent, Tr>
 where
-    Tr: Transition<Event, State>,
+    FEvent: Any + 'static,
+    Tr: Transition<State>,
 {
     type Answer = Tr::Answer;
 
@@ -51,7 +53,11 @@ where
         &self,
         from: &mut dyn Vertex<State>,
         event: Event,
-    ) -> Result<TransitionOut<State, Self::Answer>, TransitionError<Event>> {
+    ) -> Result<TransitionOut<State, Self::Answer>, TransitionError> {
+        let event = event.downcast().map_err(|event| TransitionError {
+            event,
+            kind: TransitionErrorKind::WrongEvent,
+        })?;
         match self.guards.iter().map(|g| g.check(&event)).all(|x| x) {
             true => self.transition.transition(from, event),
             false => Err(TransitionError::new(event, TransitionErrorKind::GuardErr)),

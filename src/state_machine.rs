@@ -1,3 +1,4 @@
+use crate::event::Event;
 use crate::state::SimpleVertex;
 use crate::state::{Cast, InitialPseudostate};
 use crate::transition::{Transition, TransitionError, TransitionErrorKind, TransitionOut};
@@ -5,13 +6,13 @@ use crate::vertex::Vertex;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
-pub struct StateMachine<Event, Answer, State: ?Sized = dyn Any> {
+pub struct StateMachine<Answer, State: ?Sized = dyn Any> {
     state: usize,
     vertexes: Vec<Box<dyn Vertex<State>>>,
-    transitions: HashMap<TypeId, Vec<Box<dyn Transition<Event, State, Answer = Answer>>>>,
+    transitions: HashMap<TypeId, Vec<Box<dyn Transition<State, Answer = Answer>>>>,
 }
 
-impl<Event, Answer, State> StateMachine<Event, Answer, State>
+impl<Answer, State> StateMachine<Answer, State>
 where
     State: ?Sized + 'static,
 {
@@ -43,7 +44,7 @@ where
         self.vertexes.push(vertex);
         self
     }
-    pub fn transition<T: Transition<Event, State, Answer = Answer> + 'static>(
+    pub fn transition<T: Transition<State, Answer = Answer> + 'static>(
         mut self,
         transition: T,
     ) -> Self {
@@ -66,7 +67,18 @@ where
         self
     }
 
-    pub fn process(&mut self, mut event: Event) -> Result<Answer, SmError<Event>> {
+    pub fn process<E: Any + 'static>(&mut self, event: E) -> Result<Answer, SmError<E>> {
+        self.process_boxed(Box::new(event)).map_err(|e| match e {
+            SmError::NoTransitionSatisfyingEvent(e) => {
+                SmError::NoTransitionSatisfyingEvent(*e.downcast().unwrap())
+            }
+            SmError::NoTransitionsFromThisVertex(e) => {
+                SmError::NoTransitionsFromThisVertex(*e.downcast().unwrap())
+            }
+        })
+    }
+
+    pub fn process_boxed(&mut self, event: Event) -> Result<Answer, SmError<Event>> {
         let state = self.vertexes[self.state].as_mut();
         let state_tid = state.data_tid();
 
@@ -74,6 +86,7 @@ where
             Some(ts) => ts,
             None => return Err(SmError::NoTransitionsFromThisVertex(event)),
         };
+        let mut event = event;
         for transition in transitions {
             match transition.transition(state, event) {
                 Ok(TransitionOut {
@@ -94,7 +107,7 @@ where
                         kind,
                     } = e;
                     match kind {
-                        TransitionErrorKind::GuardErr => {
+                        TransitionErrorKind::GuardErr | TransitionErrorKind::WrongEvent => {
                             event = event1;
                             continue;
                         }

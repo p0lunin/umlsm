@@ -1,15 +1,16 @@
+use crate::event::Event;
 use crate::state::Cast;
 use crate::vertex::Vertex;
 use std::any::{Any, TypeId};
 use std::marker::PhantomData;
 
-pub trait Transition<Event, State: ?Sized = dyn Any> {
+pub trait Transition<State: ?Sized = dyn Any> {
     type Answer;
     fn transition(
         &self,
         from: &mut dyn Vertex<State>,
         event: Event,
-    ) -> Result<TransitionOut<State, Self::Answer>, TransitionError<Event>>;
+    ) -> Result<TransitionOut<State, Self::Answer>, TransitionError>;
     fn input_tid(&self) -> TypeId;
     /// This function is used only in the initialization moment to check that state machine contains
     /// necessary output vertex.
@@ -21,12 +22,12 @@ pub struct TransitionOut<State: ?Sized, A> {
     pub answer: A,
 }
 
-pub struct TransitionError<Event> {
+pub struct TransitionError {
     pub event: Event,
     pub kind: TransitionErrorKind,
 }
 
-impl<Event> TransitionError<Event> {
+impl TransitionError {
     pub fn new(event: Event, kind: TransitionErrorKind) -> Self {
         TransitionError { event, kind }
     }
@@ -34,18 +35,19 @@ impl<Event> TransitionError<Event> {
 
 pub enum TransitionErrorKind {
     GuardErr,
+    WrongEvent,
 }
 
 pub struct EmptyTransition;
 
-impl<Event, State: ?Sized> Transition<Event, State> for EmptyTransition {
+impl<State: ?Sized> Transition<State> for EmptyTransition {
     type Answer = ();
 
     fn transition(
         &self,
         _: &mut dyn Vertex<State>,
         _: Event,
-    ) -> Result<TransitionOut<State, Self::Answer>, TransitionError<Event>> {
+    ) -> Result<TransitionOut<State, Self::Answer>, TransitionError> {
         unreachable!("It seems you forgot to initialize transition for something.")
     }
 
@@ -75,12 +77,13 @@ where
     }
 }
 
-impl<F, Input, Output, Answer, Event, State> Transition<Event, State>
-    for FuncTransition<F, (Input, Event)>
+impl<F, Input, Output, Answer, FEvent, State> Transition<State>
+    for FuncTransition<F, (Input, FEvent)>
 where
     Input: 'static,
     Output: 'static,
-    F: Fn(Input, Event) -> (Output, Answer),
+    FEvent: Any + 'static,
+    F: Fn(Input, FEvent) -> (Output, Answer),
     State: ?Sized + Cast<Input> + Cast<Output>,
 {
     type Answer = Answer;
@@ -89,10 +92,14 @@ where
         &self,
         from: &mut dyn Vertex<State>,
         event: Event,
-    ) -> Result<TransitionOut<State, Self::Answer>, TransitionError<Event>> {
+    ) -> Result<TransitionOut<State, Self::Answer>, TransitionError> {
+        let fevent = event.downcast::<FEvent>().map_err(|e| TransitionError {
+            event: e,
+            kind: TransitionErrorKind::WrongEvent,
+        })?;
         from.exit();
         let input = from.get_data().downcast();
-        let out = (self.0)(*input, event);
+        let out = (self.0)(*input, *fevent);
         Ok(TransitionOut {
             state: State::upcast(Box::new(out.0)),
             answer: out.1,
