@@ -1,18 +1,16 @@
 use crate::event::Event;
-use crate::state::SimpleVertex;
-use crate::state::{Cast, InitialPseudostate};
 use crate::transition::{Transition, TransitionError, TransitionErrorKind, TransitionOut};
 use crate::vertex::Vertex;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
-pub struct Sm<Answer, State: ?Sized = dyn Any> {
+pub struct Sm<State: ?Sized = dyn Any> {
     state: usize,
     vertexes: Vec<Box<dyn Vertex<State>>>,
-    transitions: HashMap<TypeId, Vec<Box<dyn Transition<State, Answer = Answer>>>>,
+    transitions: HashMap<TypeId, Vec<Box<dyn Transition<State>>>>,
 }
 
-impl<Answer, State> Sm<Answer, State>
+impl<State> Sm<State>
 where
     State: ?Sized + 'static,
 {
@@ -22,7 +20,7 @@ where
     /// Probably sm will fail on first `sm.process()` call.
     pub fn new(
         vertexes: Vec<Box<dyn Vertex<State>>>,
-        transitions: HashMap<TypeId, Vec<Box<dyn Transition<State, Answer = Answer>>>>,
+        transitions: HashMap<TypeId, Vec<Box<dyn Transition<State>>>>,
     ) -> Self {
         Sm {
             state: 0,
@@ -31,7 +29,7 @@ where
         }
     }
 
-    pub fn process<E: Any + 'static>(&mut self, event: E) -> Result<Answer, SmError<E>> {
+    pub fn process<E: Any + 'static>(&mut self, event: E) -> Result<(), SmError<E>> {
         self.process_boxed(Box::new(event)).map_err(|e| match e {
             SmError::NoTransitionSatisfyingEvent(e) => {
                 SmError::NoTransitionSatisfyingEvent(*e.downcast().unwrap())
@@ -42,7 +40,7 @@ where
         })
     }
 
-    pub fn process_boxed(&mut self, event: Event) -> Result<Answer, SmError<Event>> {
+    pub fn process_boxed(&mut self, event: Event) -> Result<(), SmError<Event>> {
         let state = self.vertexes[self.state].as_mut();
         let state_tid = state.data_tid();
 
@@ -53,17 +51,14 @@ where
         let mut event = event;
         for transition in transitions {
             match transition.transition(state, event) {
-                Ok(TransitionOut {
-                    state: new_state,
-                    answer,
-                }) => {
+                Ok(TransitionOut { state: new_state }) => {
                     let new_vertex = self
                         .find_vertex_by_data_tid(new_state.as_ref().type_id())
                         .expect("It should be checked in the `transition` function");
                     self.vertexes[new_vertex].set_data(new_state);
                     self.vertexes[new_vertex].entry();
                     self.state = new_vertex;
-                    return Ok(answer);
+                    return Ok(());
                 }
                 Err(e) => {
                     let TransitionError {

@@ -57,7 +57,7 @@ impl<T: Debug + Any> Cast<T> for dyn MyState {
     }
 }
 
-type Sm = umlsm::Sm<(), dyn MyState>;
+type Sm = umlsm::Sm<dyn MyState>;
 
 fn create_sm() -> Sm {
     SmBuilder::new()
@@ -76,7 +76,7 @@ fn create_sm() -> Sm {
         .build()
 }
 
-fn switch_state<P, E, N>(_from: P, _event: E, to: N) -> impl Transition<dyn MyState, Answer = ()>
+fn switch_state<P, E, N>(_from: P, _event: E, to: N) -> impl Transition<dyn MyState>
 where
     P: Debug + 'static,
     E: 'static,

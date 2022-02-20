@@ -47,13 +47,11 @@ where
     FEvent: Any + 'static,
     Tr: Transition<State>,
 {
-    type Answer = Tr::Answer;
-
     fn transition(
         &self,
         from: &mut dyn Vertex<State>,
         event: Event,
-    ) -> Result<TransitionOut<State, Self::Answer>, TransitionError> {
+    ) -> Result<TransitionOut<State>, TransitionError> {
         let event = event.downcast().map_err(|event| TransitionError {
             event,
             kind: TransitionErrorKind::WrongEvent,

@@ -1,18 +1,17 @@
-use crate::event::Event;
 use crate::sm::sm::Sm;
 use crate::state::SimpleVertex;
 use crate::state::{Cast, InitialPseudostate};
-use crate::transition::{Transition, TransitionError, TransitionErrorKind, TransitionOut};
+use crate::transition::Transition;
 use crate::vertex::Vertex;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
-pub struct SmBuilder<Answer, State: ?Sized = dyn Any> {
+pub struct SmBuilder<State: ?Sized = dyn Any> {
     vertexes: Vec<Box<dyn Vertex<State>>>,
-    transitions: HashMap<TypeId, Vec<Box<dyn Transition<State, Answer = Answer>>>>,
+    transitions: HashMap<TypeId, Vec<Box<dyn Transition<State>>>>,
 }
 
-impl<Answer, State> SmBuilder<Answer, State>
+impl<State> SmBuilder<State>
 where
     State: ?Sized + 'static,
 {
@@ -31,10 +30,7 @@ where
         self.vertexes.push(vertex);
         self
     }
-    pub fn transition<T: Transition<State, Answer = Answer> + 'static>(
-        mut self,
-        transition: T,
-    ) -> Self {
+    pub fn transition<T: Transition<State> + 'static>(mut self, transition: T) -> Self {
         assert!(
             self.find_vertex_by_data_tid(transition.input_tid())
                 .is_some(),
@@ -54,7 +50,7 @@ where
         self
     }
 
-    pub fn build(self) -> Sm<Answer, State> {
+    pub fn build(self) -> Sm<State> {
         Sm::new(self.vertexes, self.transitions)
     }
 

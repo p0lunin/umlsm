@@ -5,21 +5,19 @@ use std::any::{Any, TypeId};
 use std::marker::PhantomData;
 
 pub trait Transition<State: ?Sized = dyn Any> {
-    type Answer;
     fn transition(
         &self,
         from: &mut dyn Vertex<State>,
         event: Event,
-    ) -> Result<TransitionOut<State, Self::Answer>, TransitionError>;
+    ) -> Result<TransitionOut<State>, TransitionError>;
     fn input_tid(&self) -> TypeId;
     /// This function is used only in the initialization moment to check that state machine contains
     /// necessary output vertex.
     fn output_tid(&self) -> TypeId;
 }
 
-pub struct TransitionOut<State: ?Sized, A> {
+pub struct TransitionOut<State: ?Sized> {
     pub state: Box<State>,
-    pub answer: A,
 }
 
 pub struct TransitionError {
@@ -41,13 +39,11 @@ pub enum TransitionErrorKind {
 pub struct EmptyTransition;
 
 impl<State: ?Sized> Transition<State> for EmptyTransition {
-    type Answer = ();
-
     fn transition(
         &self,
         _: &mut dyn Vertex<State>,
         _: Event,
-    ) -> Result<TransitionOut<State, Self::Answer>, TransitionError> {
+    ) -> Result<TransitionOut<State>, TransitionError> {
         unreachable!("It seems you forgot to initialize transition for something.")
     }
 
@@ -77,22 +73,19 @@ where
     }
 }
 
-impl<F, Input, Output, Answer, FEvent, State> Transition<State>
-    for FuncTransition<F, (Input, FEvent)>
+impl<F, Input, Output, FEvent, State> Transition<State> for FuncTransition<F, (Input, FEvent)>
 where
     Input: 'static,
     Output: 'static,
     FEvent: Any + 'static,
-    F: Fn(Input, FEvent) -> (Output, Answer),
+    F: Fn(Input, FEvent) -> Output,
     State: ?Sized + Cast<Input> + Cast<Output>,
 {
-    type Answer = Answer;
-
     fn transition(
         &self,
         from: &mut dyn Vertex<State>,
         event: Event,
-    ) -> Result<TransitionOut<State, Self::Answer>, TransitionError> {
+    ) -> Result<TransitionOut<State>, TransitionError> {
         let fevent = event.downcast::<FEvent>().map_err(|e| TransitionError {
             event: e,
             kind: TransitionErrorKind::WrongEvent,
@@ -101,8 +94,7 @@ where
         let input = from.get_data().downcast();
         let out = (self.0)(*input, *fevent);
         Ok(TransitionOut {
-            state: State::upcast(Box::new(out.0)),
-            answer: out.1,
+            state: State::upcast(Box::new(out)),
         })
     }
 
