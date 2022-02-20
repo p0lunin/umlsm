@@ -35,6 +35,7 @@ impl<T: Any> Cast<T> for dyn Any {
     }
 }
 
+#[derive(Debug)]
 pub struct InitialPseudostate;
 
 pub struct SimpleVertex<T> {

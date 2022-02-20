@@ -6,65 +6,29 @@ use crate::vertex::Vertex;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
-pub struct StateMachine<Answer, State: ?Sized = dyn Any> {
+pub struct Sm<Answer, State: ?Sized = dyn Any> {
     state: usize,
     vertexes: Vec<Box<dyn Vertex<State>>>,
     transitions: HashMap<TypeId, Vec<Box<dyn Transition<State, Answer = Answer>>>>,
 }
 
-impl<Answer, State> StateMachine<Answer, State>
+impl<Answer, State> Sm<Answer, State>
 where
     State: ?Sized + 'static,
 {
-    pub fn new() -> Self
-    where
-        State: Cast<InitialPseudostate>,
-    {
-        let vertexes = vec![Box::new(SimpleVertex::with_data(InitialPseudostate)) as _];
-        let transitions = HashMap::new();
-        StateMachine {
-            state: 0,
-            vertexes,
-            transitions,
-        }
-    }
-    pub fn with_default_state(mut vertex: Box<dyn Vertex<State>>) -> Self {
-        let data = vertex.get_data();
-        vertex.set_data(data);
-
-        let vertexes = vec![vertex];
-        let transitions = HashMap::new();
-        StateMachine {
-            state: 0,
-            vertexes,
-            transitions,
-        }
-    }
-    pub fn register_vertex(mut self, vertex: Box<dyn Vertex<State>>) -> Self {
-        self.vertexes.push(vertex);
-        self
-    }
-    pub fn transition<T: Transition<State, Answer = Answer> + 'static>(
-        mut self,
-        transition: T,
+    /// Creates a new state machine.
+    ///
+    /// Note that first vertex in the list must be default, otherwise behaviour is unspecified.
+    /// Probably sm will fail on first `sm.process()` call.
+    pub fn new(
+        vertexes: Vec<Box<dyn Vertex<State>>>,
+        transitions: HashMap<TypeId, Vec<Box<dyn Transition<State, Answer = Answer>>>>,
     ) -> Self {
-        assert!(
-            self.find_vertex_by_data_tid(transition.input_tid())
-                .is_some(),
-            "Not found input vertex!"
-        );
-        assert!(
-            self.find_vertex_by_data_tid(transition.output_tid())
-                .is_some(),
-            "Not found output vertex!"
-        );
-
-        let trans = Box::new(transition);
-        self.transitions
-            .entry(trans.input_tid())
-            .or_default()
-            .push(trans);
-        self
+        Sm {
+            state: 0,
+            vertexes,
+            transitions,
+        }
     }
 
     pub fn process<E: Any + 'static>(&mut self, event: E) -> Result<Answer, SmError<E>> {

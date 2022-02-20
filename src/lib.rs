@@ -1,11 +1,11 @@
 pub use event::Event;
-pub use state_machine::{SmError, StateMachine};
+pub use sm::{Sm, SmBuilder, SmError};
 pub use vertex::Vertex;
 
 mod event;
 pub mod guard;
+mod sm;
 pub mod state;
-mod state_machine;
 pub mod transition;
 mod vertex;
 

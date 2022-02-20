@@ -4,7 +4,7 @@ use std::any::{Any, TypeId};
 use std::fmt::Debug;
 use umlsm::state::{Cast, SimpleVertex};
 use umlsm::transition::{ftrans, Transition};
-use umlsm::{Event, StateMachine};
+use umlsm::{Event, SmBuilder};
 
 // States
 #[derive(Debug, Clone)]
@@ -57,10 +57,11 @@ impl<T: Debug + Any> Cast<T> for dyn MyState {
     }
 }
 
-type Sm = StateMachine<(), dyn MyState>;
+type Sm = umlsm::Sm<(), dyn MyState>;
 
 fn create_sm() -> Sm {
-    Sm::with_default_state(SimpleVertex::with_data(LiquidWater).boxed())
+    SmBuilder::new()
+        .register_vertex(SimpleVertex::with_data(LiquidWater).boxed())
         .register_vertex(SimpleVertex::with_data(WaterVapor).boxed())
         .register_vertex(SimpleVertex::with_data(Plasma).boxed())
         .register_vertex(SimpleVertex::with_data(IceOrFrost).boxed())
@@ -72,6 +73,7 @@ fn create_sm() -> Sm {
         .transition(switch_state(LiquidWater, Freeze, IceOrFrost))
         .transition(switch_state(WaterVapor, Deposition, IceOrFrost))
         .transition(switch_state(IceOrFrost, Sublimation, WaterVapor))
+        .build()
 }
 
 fn switch_state<P, E, N>(_from: P, _event: E, to: N) -> impl Transition<dyn MyState, Answer = ()>
