@@ -31,6 +31,21 @@ where
             transitions,
         }
     }
+    pub fn with_default_state<T>(state: T) -> Self
+    where
+        DynData: Cast<T>,
+        T: 'static,
+    {
+        let vertexes = vec![Vertex::PseudoState(PseudoState::new(
+            Some(Box::new(state)),
+            PseudoStateKind::Initial,
+        ))];
+        let transitions = HashMap::new();
+        SmBuilder {
+            vertexes,
+            transitions,
+        }
+    }
     pub fn register_vertex(mut self, vertex: Vertex<DynData>) -> Self {
         self.vertexes.push(vertex);
         self

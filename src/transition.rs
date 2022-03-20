@@ -33,6 +33,7 @@ impl TransitionError {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
 pub enum TransitionErrorKind {
     GuardErr,
     WrongEvent,

@@ -11,10 +11,10 @@ mod vertex;
 
 #[cfg(test)]
 mod tests {
+    use std::any::Any;
     use super::*;
     use crate::guard::GuardedTransition;
-    use crate::state::InitialPseudostate;
-    use crate::state::SimpleVertex;
+    use crate::state::{InitialPseudoState, SimpleVertex};
     use crate::transition::ftrans;
 
     #[test]
@@ -23,11 +23,14 @@ mod tests {
         struct SomeState2;
 
         let mut machine =
-            StateMachine::with_default_state(SimpleVertex::with_data(SomeState).boxed())
-                .register_vertex(SimpleVertex::<SomeState2>::new().boxed())
-                .transition(ftrans(|_: SomeState, event: i32| (SomeState2, event * 2)));
+            SmBuilder::<dyn Any>::with_default_state(SomeState)
+                .transition(ftrans(|_: SomeState, event: EnterSmEvent| SomeState))
+                .register_vertex(SimpleVertex::<SomeState2>::new().to_vertex())
+                .transition(ftrans(|_: SomeState, event: i32| SomeState2))
+                .build()
+                .unwrap();
 
-        assert_eq!(machine.process(3), Ok(6));
+        assert_eq!(machine.process(3), Ok(()));
         assert_eq!(
             machine.process(3),
             Err(SmError::NoTransitionsFromThisVertex(3))
@@ -36,24 +39,49 @@ mod tests {
 
     #[test]
     fn test_guards() {
-        let mut machine = StateMachine::new()
+        #[derive(Debug, PartialEq)]
+        struct ChooseState;
+        #[derive(Debug, PartialEq)]
+        struct DivisibleBy2(u64);
+        #[derive(Debug, PartialEq)]
+        struct DivisibleBy3(u64);
+
+        let make_machine = || SmBuilder::<dyn Any>::new()
+            .register_vertex(SimpleVertex::with_data(ChooseState).to_vertex())
+            .register_vertex(SimpleVertex::<DivisibleBy2>::new().to_vertex())
+            .register_vertex(SimpleVertex::<DivisibleBy3>::new().to_vertex())
+            .transition(ftrans(|_: InitialPseudoState, _: EnterSmEvent| ChooseState))
             .transition(
                 GuardedTransition::new()
-                    .guard(|event: &i32| event % 2 == 0)
-                    .transition(ftrans(|_: InitialPseudostate, event: i32| {
-                        (InitialPseudostate, event * 2)
+                    .guard(|event: &u64| event % 2 == 0)
+                    .transition(ftrans(|_: ChooseState, number: u64| {
+                        DivisibleBy2(number)
                     })),
             )
             .transition(
                 GuardedTransition::new()
-                    .guard(|event: &i32| event % 3 == 0)
-                    .transition(ftrans(|_: InitialPseudostate, event: i32| {
-                        (InitialPseudostate, event * 3)
+                    .guard(|event: &u64| event % 3 == 0)
+                    .transition(ftrans(|_: ChooseState, number: u64| {
+                        DivisibleBy3(number)
                     })),
-            );
+            )
+            .build()
+            .unwrap();
 
-        assert_eq!(machine.process(2), Ok(2 * 2));
-        assert_eq!(machine.process(3), Ok(3 * 3));
-        assert_eq!(machine.process(6), Ok(6 * 2));
+        {
+            let mut sm = make_machine();
+            assert_eq!(sm.process(2_u64), Ok(()));
+            assert_eq!(sm.current_state_concrete(), Some(&DivisibleBy2(2)));
+        }
+        {
+            let mut sm = make_machine();
+            assert_eq!(sm.process(3_u64), Ok(()));
+            assert_eq!(sm.current_state_concrete(), Some(&DivisibleBy3(3)));
+        }
+        {
+            let mut sm = make_machine();
+            assert_eq!(sm.process(6_u64), Ok(()));
+            assert_eq!(sm.current_state_concrete(), Some(&DivisibleBy2(6)));
+        }
     }
 }

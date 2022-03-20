@@ -15,6 +15,16 @@ pub trait Cast<From: 'static>: Any {
             panic!("Must be guaranteed by the caller.")
         }
     }
+    fn downcast_ref(self: &Self) -> Option<&From> {
+        if self.concrete_tid() == TypeId::of::<From>() {
+            unsafe {
+                let rf = &*(self as *const Self as *const From);
+                Some(rf)
+            }
+        } else {
+            None
+        }
+    }
 }
 
 impl<T: Any> Cast<T> for dyn Any {

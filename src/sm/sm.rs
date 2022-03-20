@@ -105,6 +105,14 @@ where
         self.vertexes[self.state].get_data_as_ref()
     }
 
+    pub fn current_state_concrete<T>(&self) -> Option<&T>
+    where
+        DynData: Cast<T>,
+        T: 'static,
+    {
+        DynData::downcast_ref(self.current_state())
+    }
+
     fn find_vertex_by_data_tid(&self, tid: TypeId) -> Option<usize> {
         self.vertexes
             .iter()
