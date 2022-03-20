@@ -42,16 +42,16 @@ impl<Event> GuardedTransition<Event, EmptyTransition> {
     }
 }
 
-impl<FEvent, Tr, State: ?Sized> Transition<State> for GuardedTransition<FEvent, Tr>
+impl<FEvent, Tr, DynData: ?Sized> Transition<DynData> for GuardedTransition<FEvent, Tr>
 where
     FEvent: Any + 'static,
-    Tr: Transition<State>,
+    Tr: Transition<DynData>,
 {
     fn transition(
         &self,
-        from: &mut dyn Vertex<State>,
+        from: &mut Vertex<DynData>,
         event: Event,
-    ) -> Result<TransitionOut<State>, TransitionError> {
+    ) -> Result<TransitionOut<DynData>, TransitionError> {
         let event = event.downcast().map_err(|event| TransitionError {
             event,
             kind: TransitionErrorKind::WrongEvent,

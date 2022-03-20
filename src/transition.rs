@@ -1,13 +1,15 @@
 use crate::event::Event;
 use crate::state::Cast;
-use crate::vertex::Vertex;
+use crate::vertex::{StateTrait, Vertex};
 use std::any::{Any, TypeId};
 use std::marker::PhantomData;
+use std::process::Output;
+use crate::Sm;
 
 pub trait Transition<State: ?Sized = dyn Any> {
     fn transition(
         &self,
-        from: &mut dyn Vertex<State>,
+        from: &mut Vertex<State>,
         event: Event,
     ) -> Result<TransitionOut<State>, TransitionError>;
     fn input_tid(&self) -> TypeId;
@@ -38,12 +40,12 @@ pub enum TransitionErrorKind {
 
 pub struct EmptyTransition;
 
-impl<State: ?Sized> Transition<State> for EmptyTransition {
+impl<DynData: ?Sized> Transition<DynData> for EmptyTransition {
     fn transition(
         &self,
-        _: &mut dyn Vertex<State>,
+        _: &mut Vertex<DynData>,
         _: Event,
-    ) -> Result<TransitionOut<State>, TransitionError> {
+    ) -> Result<TransitionOut<DynData>, TransitionError> {
         unreachable!("It seems you forgot to initialize transition for something.")
     }
 
@@ -62,9 +64,9 @@ pub fn ftrans<F: Into<FuncTransition<F, Args>>, Args>(f: F) -> FuncTransition<F,
     f.into()
 }
 
-impl<F, Input, Output, Event, Answer> From<F> for FuncTransition<F, (Input, Event)>
+impl<F, Input, Output, Event> From<F> for FuncTransition<F, (Input, Event)>
 where
-    F: Fn(Input, Event) -> (Output, Answer),
+    F: Fn(Input, Event) -> Output,
     Input: Any,
     Output: Any,
 {
@@ -73,19 +75,19 @@ where
     }
 }
 
-impl<F, Input, Output, FEvent, State> Transition<State> for FuncTransition<F, (Input, FEvent)>
+impl<F, Input, Output, FEvent, DynData> Transition<DynData> for FuncTransition<F, (Input, FEvent)>
 where
     Input: 'static,
     Output: 'static,
     FEvent: Any + 'static,
     F: Fn(Input, FEvent) -> Output,
-    State: ?Sized + Cast<Input> + Cast<Output>,
+    DynData: ?Sized + Cast<Input> + Cast<Output> + Cast<Sm<DynData>>,
 {
     fn transition(
         &self,
-        from: &mut dyn Vertex<State>,
+        from: &mut Vertex<DynData>,
         event: Event,
-    ) -> Result<TransitionOut<State>, TransitionError> {
+    ) -> Result<TransitionOut<DynData>, TransitionError> {
         let fevent = event.downcast::<FEvent>().map_err(|e| TransitionError {
             event: e,
             kind: TransitionErrorKind::WrongEvent,
@@ -94,7 +96,7 @@ where
         let input = from.get_data().downcast();
         let out = (self.0)(*input, *fevent);
         Ok(TransitionOut {
-            state: State::upcast(Box::new(out)),
+            state: DynData::upcast(Box::new(out)),
         })
     }
 

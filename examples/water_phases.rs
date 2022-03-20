@@ -2,9 +2,9 @@
 
 use std::any::{Any, TypeId};
 use std::fmt::Debug;
-use umlsm::state::{Cast, SimpleVertex};
+use umlsm::state::{Cast, InitialPseudoState, SimpleVertex};
 use umlsm::transition::{ftrans, Transition};
-use umlsm::{Event, SmBuilder};
+use umlsm::{EnterSmEvent, Event, SmBuilder};
 
 // States
 #[derive(Debug, Clone)]
@@ -61,10 +61,11 @@ type Sm = umlsm::Sm<dyn MyState>;
 
 fn create_sm() -> Sm {
     SmBuilder::new()
-        .register_vertex(SimpleVertex::with_data(LiquidWater).boxed())
-        .register_vertex(SimpleVertex::with_data(WaterVapor).boxed())
-        .register_vertex(SimpleVertex::with_data(Plasma).boxed())
-        .register_vertex(SimpleVertex::with_data(IceOrFrost).boxed())
+        .register_vertex(SimpleVertex::with_data(LiquidWater).to_vertex())
+        .register_vertex(SimpleVertex::with_data(WaterVapor).to_vertex())
+        .register_vertex(SimpleVertex::with_data(Plasma).to_vertex())
+        .register_vertex(SimpleVertex::with_data(IceOrFrost).to_vertex())
+        .transition(switch_state(InitialPseudoState, EnterSmEvent, LiquidWater))
         .transition(switch_state(WaterVapor, Ionize, Plasma))
         .transition(switch_state(Plasma, Deionize, WaterVapor))
         .transition(switch_state(LiquidWater, Vaporize, WaterVapor))
@@ -74,6 +75,7 @@ fn create_sm() -> Sm {
         .transition(switch_state(WaterVapor, Deposition, IceOrFrost))
         .transition(switch_state(IceOrFrost, Sublimation, WaterVapor))
         .build()
+        .unwrap()
 }
 
 fn switch_state<P, E, N>(_from: P, _event: E, to: N) -> impl Transition<dyn MyState>
@@ -82,7 +84,7 @@ where
     E: 'static,
     N: Debug + Clone + 'static,
 {
-    ftrans(move |_prev: P, _event: E| (to.clone(), ()))
+    ftrans(move |_prev: P, _event: E| to.clone())
 }
 
 fn main() {

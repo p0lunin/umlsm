@@ -1,6 +1,6 @@
-pub use event::Event;
 pub use sm::{Sm, SmBuilder, SmError};
 pub use vertex::Vertex;
+pub use event::{EnterSmEvent, Event};
 
 mod event;
 pub mod guard;

@@ -1,36 +1,44 @@
 use crate::sm::sm::Sm;
-use crate::state::SimpleVertex;
-use crate::state::{Cast, InitialPseudostate};
+use crate::state::{InitialPseudoState, SimpleVertex};
+use crate::state::{Cast};
 use crate::transition::Transition;
-use crate::vertex::Vertex;
+use crate::vertex::{PseudoState, PseudoStateKind, StateTrait, Vertex};
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
+use crate::event::EnterSmEvent;
+use crate::SmError;
 
-pub struct SmBuilder<State: ?Sized = dyn Any> {
-    vertexes: Vec<Box<dyn Vertex<State>>>,
-    transitions: HashMap<TypeId, Vec<Box<dyn Transition<State>>>>,
+pub struct SmBuilder<DynData: ?Sized = dyn Any> {
+    vertexes: Vec<Vertex<DynData>>,
+    transitions: HashMap<TypeId, Vec<Box<dyn Transition<DynData>>>>,
 }
 
-impl<State> SmBuilder<State>
+impl<DynData> SmBuilder<DynData>
 where
-    State: ?Sized + 'static,
+    DynData: ?Sized + 'static,
 {
     pub fn new() -> Self
     where
-        State: Cast<InitialPseudostate>,
+        DynData: Cast<InitialPseudoState>
     {
-        let vertexes = vec![Box::new(SimpleVertex::with_data(InitialPseudostate)) as _];
+        let vertexes = vec![Vertex::PseudoState(PseudoState::new(
+            Some(Box::new(InitialPseudoState)),
+            PseudoStateKind::Initial,
+        ))];
         let transitions = HashMap::new();
         SmBuilder {
             vertexes,
             transitions,
         }
     }
-    pub fn register_vertex(mut self, vertex: Box<dyn Vertex<State>>) -> Self {
+    pub fn register_vertex(mut self, vertex: Vertex<DynData>) -> Self {
         self.vertexes.push(vertex);
         self
     }
-    pub fn transition<T: Transition<State> + 'static>(mut self, transition: T) -> Self {
+    pub fn transition<T: Transition<DynData> + 'static>(mut self, transition: T) -> Self
+    where
+        DynData: Cast<Sm<DynData>>,
+    {
         assert!(
             self.find_vertex_by_data_tid(transition.input_tid())
                 .is_some(),
@@ -50,11 +58,17 @@ where
         self
     }
 
-    pub fn build(self) -> Sm<State> {
+    pub fn build(self) -> Result<Sm<DynData>, SmError<EnterSmEvent>>
+    where
+        DynData: Cast<Sm<DynData>>
+    {
         Sm::new(self.vertexes, self.transitions)
     }
 
-    fn find_vertex_by_data_tid(&self, tid: TypeId) -> Option<usize> {
+    fn find_vertex_by_data_tid(&self, tid: TypeId) -> Option<usize>
+    where
+        DynData: Cast<Sm<DynData>>,
+    {
         self.vertexes
             .iter()
             .enumerate()

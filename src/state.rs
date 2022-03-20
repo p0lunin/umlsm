@@ -1,4 +1,4 @@
-use crate::vertex::Vertex;
+use crate::vertex::{StateTrait, Vertex};
 use std::any::{Any, TypeId};
 
 pub trait Cast<From: 'static>: Any {
@@ -35,8 +35,8 @@ impl<T: Any> Cast<T> for dyn Any {
     }
 }
 
-#[derive(Debug)]
-pub struct InitialPseudostate;
+#[derive(Debug, PartialEq)]
+pub struct InitialPseudoState;
 
 pub struct SimpleVertex<T> {
     data: Option<Box<T>>,
@@ -83,15 +83,15 @@ impl<T> SimpleVertex<T> {
 }
 
 impl<T: 'static> SimpleVertex<T> {
-    pub fn boxed<State: Cast<T> + ?Sized>(self) -> Box<dyn Vertex<State>> {
-        Box::new(self)
+    pub fn to_vertex<DynData: Cast<T> + ?Sized>(self) -> Vertex<DynData> {
+        Vertex::State(Box::new(self))
     }
 }
 
-impl<T, State> Vertex<State> for SimpleVertex<T>
+impl<T, DynData> StateTrait<DynData> for SimpleVertex<T>
 where
     T: 'static,
-    State: Cast<T> + ?Sized,
+    DynData: Cast<T> + ?Sized,
 {
     fn entry(&self) {
         (self.entry)(
@@ -111,21 +111,21 @@ where
                 .as_ref(),
         );
     }
-    fn get_data(&mut self) -> Box<State> {
+    fn get_data(&mut self) -> Box<DynData> {
         self.data
             .take()
-            .map(|x| State::upcast(x))
+            .map(|x| DynData::upcast(x))
             .expect("This method must be called only once.")
     }
 
-    fn get_data_as_ref(&self) -> &State {
+    fn get_data_as_ref(&self) -> &DynData {
         self.data
             .as_ref()
-            .map(|x| State::upcast_ref(x))
+            .map(|x| DynData::upcast_ref(x))
             .expect("This method must be called only once.")
     }
 
-    fn set_data(&mut self, data: Box<State>) {
+    fn set_data(&mut self, data: Box<DynData>) {
         self.data = Some(data.downcast())
     }
     fn data_tid(&self) -> TypeId {
