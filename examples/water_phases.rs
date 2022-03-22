@@ -4,56 +4,31 @@ use std::any::{Any, TypeId};
 use std::fmt::Debug;
 use umlsm::state::{Cast, InitialPseudoState, SimpleVertex};
 use umlsm::transition::{ftrans, Transition};
-use umlsm::{EnterSmEvent, Event, SmBuilder};
+use umlsm::{events, states, EnterSmEvent, Event, SmBuilder};
 
-// States
-#[derive(Debug, Clone)]
-struct LiquidWater;
-#[derive(Debug, Clone)]
-struct WaterVapor;
-#[derive(Debug, Clone)]
-struct Plasma;
-#[derive(Debug, Clone)]
-struct IceOrFrost;
-
-// Events
-#[derive(Debug)]
-struct Ionize;
-#[derive(Debug)]
-struct Deionize;
-#[derive(Debug)]
-struct Vaporize;
-#[derive(Debug)]
-struct Condensate;
-#[derive(Debug)]
-struct Melt;
-#[derive(Debug)]
-struct Freeze;
-#[derive(Debug)]
-struct Deposition;
-#[derive(Debug)]
-struct Sublimation;
-
-trait MyState: Debug + Any {
-    fn tid(&self) -> TypeId;
-}
-impl<T: Debug + Any + 'static> MyState for T {
-    fn tid(&self) -> TypeId {
-        TypeId::of::<T>()
+events! {
+    #[derive(Debug)]
+    {
+        struct Ionize;
+        struct Deionize;
+        struct Vaporize;
+        struct Condensate;
+        struct Melt;
+        struct Freeze;
+        struct Deposition;
+        struct Sublimation;
     }
 }
 
-impl<T: Debug + Any> Cast<T> for dyn MyState {
-    fn upcast(from: Box<T>) -> Box<Self> {
-        from
-    }
+states! {
+    trait MyState: Debug;
 
-    fn upcast_ref(from: &T) -> &Self {
-        from
-    }
-
-    fn concrete_tid(&self) -> TypeId {
-        self.tid()
+    #[derive(Debug, Clone)]
+    {
+        struct LiquidWater;
+        struct WaterVapor;
+        struct Plasma;
+        struct IceOrFrost;
     }
 }
 

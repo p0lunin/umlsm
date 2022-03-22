@@ -1,12 +1,12 @@
+use crate::event::EnterSmEvent;
 use crate::sm::sm::Sm;
+use crate::state::Cast;
 use crate::state::{InitialPseudoState, SimpleVertex};
-use crate::state::{Cast};
 use crate::transition::Transition;
 use crate::vertex::{PseudoState, PseudoStateKind, StateTrait, Vertex};
+use crate::SmError;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
-use crate::event::EnterSmEvent;
-use crate::SmError;
 
 pub struct SmBuilder<DynData: ?Sized = dyn Any> {
     vertexes: Vec<Vertex<DynData>>,
@@ -19,7 +19,7 @@ where
 {
     pub fn new() -> Self
     where
-        DynData: Cast<InitialPseudoState>
+        DynData: Cast<InitialPseudoState>,
     {
         let vertexes = vec![Vertex::PseudoState(PseudoState::new(
             Some(Box::new(InitialPseudoState)),
@@ -75,7 +75,7 @@ where
 
     pub fn build(self) -> Result<Sm<DynData>, SmError<EnterSmEvent>>
     where
-        DynData: Cast<Sm<DynData>>
+        DynData: Cast<Sm<DynData>>,
     {
         Sm::new(self.vertexes, self.transitions)
     }

@@ -1,10 +1,10 @@
 use crate::event::Event;
 use crate::state::Cast;
 use crate::vertex::{StateTrait, Vertex};
+use crate::Sm;
 use std::any::{Any, TypeId};
 use std::marker::PhantomData;
 use std::process::Output;
-use crate::Sm;
 
 pub trait Transition<State: ?Sized = dyn Any> {
     fn transition(

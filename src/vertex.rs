@@ -1,7 +1,7 @@
+use crate::state::{Cast, SimpleVertex};
+use crate::Sm;
 use std::any::{Any, TypeId};
 use std::fmt::{Debug, Formatter};
-use crate::Sm;
-use crate::state::{Cast, SimpleVertex};
 
 /// Possible vertexes.
 ///
@@ -17,28 +17,25 @@ pub enum Vertex<DynData: ?Sized> {
 
 impl<DynData> Debug for Vertex<DynData> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Vertex")
-            .finish()
+        f.debug_struct("Vertex").finish()
     }
 }
 
-impl<DynData: ?Sized> StateTrait<DynData> for  Vertex<DynData>
+impl<DynData: ?Sized> StateTrait<DynData> for Vertex<DynData>
 where
     DynData: Cast<Sm<DynData>>,
 {
     fn entry(&self) {
         match self {
             Vertex::State(s) => s.entry(),
-            Vertex::SubMachineState(sm) => { },
+            Vertex::SubMachineState(sm) => {}
             Vertex::PseudoState(ps) => ps.entry(),
         }
     }
     fn exit(&self) {
         match self {
             Vertex::State(s) => s.exit(),
-            Vertex::SubMachineState(sm) => {
-
-            },
+            Vertex::SubMachineState(sm) => {}
             Vertex::PseudoState(ps) => ps.exit(),
         }
     }
@@ -46,7 +43,9 @@ where
     fn get_data(&mut self) -> Box<DynData> {
         match self {
             Vertex::State(s) => s.get_data(),
-            Vertex::SubMachineState(sm) => { unimplemented!() },
+            Vertex::SubMachineState(sm) => {
+                unimplemented!()
+            }
             Vertex::PseudoState(ps) => ps.get_data(),
         }
     }
@@ -79,7 +78,7 @@ where
 pub struct PseudoState<DynData: ?Sized> {
     pub(crate) data: Option<Box<DynData>>,
     pub(crate) data_tid: TypeId,
-    pub(crate) kind: PseudoStateKind
+    pub(crate) kind: PseudoStateKind,
 }
 
 impl<DynData: ?Sized> PseudoState<DynData> {
@@ -87,7 +86,11 @@ impl<DynData: ?Sized> PseudoState<DynData> {
     where
         DynData: Cast<T>,
     {
-        PseudoState { data: data.map(|x| DynData::upcast(x)), data_tid: TypeId::of::<T>(), kind }
+        PseudoState {
+            data: data.map(|x| DynData::upcast(x)),
+            data_tid: TypeId::of::<T>(),
+            kind,
+        }
     }
 }
 
@@ -96,9 +99,7 @@ impl<DynData: ?Sized> StateTrait<DynData> for PseudoState<DynData> {
         match &self.kind {
             PseudoStateKind::Initial => {}
             PseudoStateKind::Terminate => {}
-            PseudoStateKind::Entry(action) => {
-                action.perform_action()
-            }
+            PseudoStateKind::Entry(action) => action.perform_action(),
             PseudoStateKind::Exit(_) => {}
         }
     }
@@ -108,9 +109,7 @@ impl<DynData: ?Sized> StateTrait<DynData> for PseudoState<DynData> {
             PseudoStateKind::Initial => {}
             PseudoStateKind::Terminate => {}
             PseudoStateKind::Entry(_) => {}
-            PseudoStateKind::Exit(action) => {
-                action.perform_action()
-            }
+            PseudoStateKind::Exit(action) => action.perform_action(),
         }
     }
 

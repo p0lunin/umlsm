@@ -1,10 +1,10 @@
 use crate::event::{EnterSmEvent, Event};
+use crate::state::Cast;
 use crate::transition::{Transition, TransitionError, TransitionErrorKind, TransitionOut};
 use crate::vertex::{PseudoStateKind, StateTrait, Vertex};
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-use crate::state::Cast;
 
 pub struct Sm<DynData: ?Sized = dyn Any> {
     state: usize,
@@ -14,8 +14,7 @@ pub struct Sm<DynData: ?Sized = dyn Any> {
 
 impl<DynData: ?Sized> Debug for Sm<DynData> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Sm")
-            .finish()
+        f.debug_struct("Sm").finish()
     }
 }
 

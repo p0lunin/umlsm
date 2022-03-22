@@ -1,9 +1,10 @@
+pub use event::{EnterSmEvent, Event};
 pub use sm::{Sm, SmBuilder, SmError};
 pub use vertex::Vertex;
-pub use event::{EnterSmEvent, Event};
 
 mod event;
 pub mod guard;
+mod macros;
 mod sm;
 pub mod state;
 pub mod transition;
@@ -11,24 +12,23 @@ mod vertex;
 
 #[cfg(test)]
 mod tests {
-    use std::any::Any;
     use super::*;
     use crate::guard::GuardedTransition;
     use crate::state::{InitialPseudoState, SimpleVertex};
     use crate::transition::ftrans;
+    use std::any::Any;
 
     #[test]
     fn test1() {
         struct SomeState;
         struct SomeState2;
 
-        let mut machine =
-            SmBuilder::<dyn Any>::with_default_state(SomeState)
-                .transition(ftrans(|_: SomeState, event: EnterSmEvent| SomeState))
-                .register_vertex(SimpleVertex::<SomeState2>::new().to_vertex())
-                .transition(ftrans(|_: SomeState, event: i32| SomeState2))
-                .build()
-                .unwrap();
+        let mut machine = SmBuilder::<dyn Any>::with_default_state(SomeState)
+            .transition(ftrans(|_: SomeState, event: EnterSmEvent| SomeState))
+            .register_vertex(SimpleVertex::<SomeState2>::new().to_vertex())
+            .transition(ftrans(|_: SomeState, event: i32| SomeState2))
+            .build()
+            .unwrap();
 
         assert_eq!(machine.process(3), Ok(()));
         assert_eq!(
@@ -46,27 +46,25 @@ mod tests {
         #[derive(Debug, PartialEq)]
         struct DivisibleBy3(u64);
 
-        let make_machine = || SmBuilder::<dyn Any>::new()
-            .register_vertex(SimpleVertex::with_data(ChooseState).to_vertex())
-            .register_vertex(SimpleVertex::<DivisibleBy2>::new().to_vertex())
-            .register_vertex(SimpleVertex::<DivisibleBy3>::new().to_vertex())
-            .transition(ftrans(|_: InitialPseudoState, _: EnterSmEvent| ChooseState))
-            .transition(
-                GuardedTransition::new()
-                    .guard(|event: &u64| event % 2 == 0)
-                    .transition(ftrans(|_: ChooseState, number: u64| {
-                        DivisibleBy2(number)
-                    })),
-            )
-            .transition(
-                GuardedTransition::new()
-                    .guard(|event: &u64| event % 3 == 0)
-                    .transition(ftrans(|_: ChooseState, number: u64| {
-                        DivisibleBy3(number)
-                    })),
-            )
-            .build()
-            .unwrap();
+        let make_machine = || {
+            SmBuilder::<dyn Any>::new()
+                .register_vertex(SimpleVertex::with_data(ChooseState).to_vertex())
+                .register_vertex(SimpleVertex::<DivisibleBy2>::new().to_vertex())
+                .register_vertex(SimpleVertex::<DivisibleBy3>::new().to_vertex())
+                .transition(ftrans(|_: InitialPseudoState, _: EnterSmEvent| ChooseState))
+                .transition(
+                    GuardedTransition::new()
+                        .guard(|event: &u64| event % 2 == 0)
+                        .transition(ftrans(|_: ChooseState, number: u64| DivisibleBy2(number))),
+                )
+                .transition(
+                    GuardedTransition::new()
+                        .guard(|event: &u64| event % 3 == 0)
+                        .transition(ftrans(|_: ChooseState, number: u64| DivisibleBy3(number))),
+                )
+                .build()
+                .unwrap()
+        };
 
         {
             let mut sm = make_machine();
