@@ -6,6 +6,52 @@ use std::any::{Any, TypeId};
 use std::marker::PhantomData;
 use std::process::Output;
 
+pub struct Switch<From, Event, To> {
+    to: To,
+    _phantom: PhantomData<(Event, From)>,
+}
+
+impl<F, E, To: Clone> Switch<F, E, To> {
+    pub fn new(to: To) -> Switch<F, E, To> {
+        Switch {
+            to,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<DynData, From, E, To> Transition<DynData> for Switch<From, E, To>
+where
+    From: 'static,
+    To: Clone + 'static,
+    DynData: ?Sized + Cast<From> + Cast<To> + Cast<Sm<DynData>>,
+    E: 'static,
+{
+    fn transition(
+        &self,
+        from: &mut Vertex<DynData>,
+        event: Event,
+    ) -> Result<TransitionOut<DynData>, TransitionError> {
+        event.downcast::<E>().map_err(|e| TransitionError {
+            event: e,
+            kind: TransitionErrorKind::WrongEvent,
+        })?;
+        from.exit();
+        from.get_data();
+        Ok(TransitionOut {
+            state: DynData::upcast(Box::new(self.to.clone())),
+        })
+    }
+
+    fn input_tid(&self) -> TypeId {
+        TypeId::of::<From>()
+    }
+
+    fn output_tid(&self) -> TypeId {
+        TypeId::of::<To>()
+    }
+}
+
 pub trait Transition<State: ?Sized = dyn Any> {
     fn transition(
         &self,

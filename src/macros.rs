@@ -28,7 +28,7 @@ macro_rules! states {
             $(:
                 $(
                     $trait1:ident $( :: $trait2:ident )*
-                        $( < $($gen:ty)* > + )?
+                        $( < $($gen:ty),* > )?
                 ),+
             )?
         ;
@@ -71,6 +71,20 @@ macro_rules! states {
                 $($rest)*
             }
         }
+    };
+}
+
+#[macro_export]
+macro_rules! switch {
+    (
+        $trait1:ident $( :: $trait2:ident )* $( < $($gen:ty),* > )?
+        + $event:ty = $output:expr
+    ) => {
+        $crate::transition::Switch::<
+            $trait1 $( :: $trait2 )* $( < $($gen),* > )?,
+            $event,
+            _,
+        >::new($output)
     };
 }
 

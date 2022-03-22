@@ -3,8 +3,8 @@
 use std::any::{Any, TypeId};
 use std::fmt::Debug;
 use umlsm::state::{Cast, InitialPseudoState, SimpleVertex};
-use umlsm::transition::{ftrans, Transition};
-use umlsm::{events, states, EnterSmEvent, Event, SmBuilder};
+use umlsm::transition::{ftrans, Switch, Transition};
+use umlsm::{events, states, switch, EnterSmEvent, Event, SmBuilder};
 
 events! {
     #[derive(Debug)]
@@ -40,26 +40,17 @@ fn create_sm() -> Sm {
         .register_vertex(SimpleVertex::with_data(WaterVapor).to_vertex())
         .register_vertex(SimpleVertex::with_data(Plasma).to_vertex())
         .register_vertex(SimpleVertex::with_data(IceOrFrost).to_vertex())
-        .transition(switch_state(InitialPseudoState, EnterSmEvent, LiquidWater))
-        .transition(switch_state(WaterVapor, Ionize, Plasma))
-        .transition(switch_state(Plasma, Deionize, WaterVapor))
-        .transition(switch_state(LiquidWater, Vaporize, WaterVapor))
-        .transition(switch_state(WaterVapor, Condensate, LiquidWater))
-        .transition(switch_state(IceOrFrost, Melt, LiquidWater))
-        .transition(switch_state(LiquidWater, Freeze, IceOrFrost))
-        .transition(switch_state(WaterVapor, Deposition, IceOrFrost))
-        .transition(switch_state(IceOrFrost, Sublimation, WaterVapor))
+        .transition(switch!(InitialPseudoState + EnterSmEvent = LiquidWater))
+        .transition(switch!(WaterVapor + Ionize = Plasma))
+        .transition(switch!(Plasma + Deionize = WaterVapor))
+        .transition(switch!(LiquidWater + Vaporize = WaterVapor))
+        .transition(switch!(WaterVapor + Condensate = LiquidWater))
+        .transition(switch!(IceOrFrost + Melt = LiquidWater))
+        .transition(switch!(LiquidWater + Freeze = IceOrFrost))
+        .transition(switch!(WaterVapor + Deposition = IceOrFrost))
+        .transition(switch!(IceOrFrost + Sublimation = WaterVapor))
         .build()
         .unwrap()
-}
-
-fn switch_state<P, E, N>(_from: P, _event: E, to: N) -> impl Transition<dyn MyState>
-where
-    P: Debug + 'static,
-    E: 'static,
-    N: Debug + Clone + 'static,
-{
-    ftrans(move |_prev: P, _event: E| to.clone())
 }
 
 fn main() {
