@@ -72,6 +72,12 @@ impl<T: 'static> SimpleVertex<T> {
             exit: Box::new(do_nothing),
         }
     }
+
+    pub fn get_data_as_mut_concrete(&mut self) -> &mut T {
+        self.data
+            .as_mut()
+            .expect("Should be guaranteed by the caller.")
+    }
 }
 
 impl<T> SimpleVertex<T> {

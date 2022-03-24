@@ -28,14 +28,14 @@ where
     fn entry(&self) {
         match self {
             Vertex::State(s) => s.entry(),
-            Vertex::SubMachineState(sm) => {}
+            Vertex::SubMachineState(sm) => sm.entry(),
             Vertex::PseudoState(ps) => ps.entry(),
         }
     }
     fn exit(&self) {
         match self {
             Vertex::State(s) => s.exit(),
-            Vertex::SubMachineState(sm) => {}
+            Vertex::SubMachineState(sm) => sm.exit(),
             Vertex::PseudoState(ps) => ps.exit(),
         }
     }
@@ -43,9 +43,7 @@ where
     fn get_data(&mut self) -> Box<DynData> {
         match self {
             Vertex::State(s) => s.get_data(),
-            Vertex::SubMachineState(sm) => {
-                unimplemented!()
-            }
+            Vertex::SubMachineState(_) => unreachable!(),
             Vertex::PseudoState(ps) => ps.get_data(),
         }
     }
@@ -53,7 +51,7 @@ where
     fn get_data_as_ref(&self) -> &DynData {
         match self {
             Vertex::State(s) => s.get_data_as_ref(),
-            Vertex::SubMachineState(sm) => unimplemented!(),
+            Vertex::SubMachineState(_) => unreachable!(),
             Vertex::PseudoState(ps) => ps.get_data_as_ref(),
         }
     }
@@ -61,7 +59,7 @@ where
     fn set_data(&mut self, data: Box<DynData>) {
         match self {
             Vertex::State(s) => s.set_data(data),
-            Vertex::SubMachineState(sm) => sm.set_data(data),
+            Vertex::SubMachineState(_) => unreachable!(),
             Vertex::PseudoState(ps) => ps.set_data(data),
         }
     }
@@ -69,7 +67,7 @@ where
     fn data_tid(&self) -> TypeId {
         match self {
             Vertex::State(s) => s.data_tid(),
-            Vertex::SubMachineState(sm) => StateTrait::<DynData>::data_tid(sm),
+            Vertex::SubMachineState(sm) => unreachable!(),
             Vertex::PseudoState(ps) => ps.data_tid(),
         }
     }
