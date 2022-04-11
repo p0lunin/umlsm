@@ -11,7 +11,10 @@ use std::fmt::{Debug, Formatter};
 /// 3. There are can be multiple transitions *from* this state.
 pub enum Vertex<DynData: ?Sized> {
     State(Box<dyn StateTrait<DynData>>),
-    SubMachineState(SimpleVertex<Sm<DynData>>),
+    SubMachineState {
+        handler: Box<dyn StateTrait<DynData>>,
+        sm: Sm<DynData>,
+    },
     PseudoState(PseudoState<DynData>),
 }
 
@@ -28,14 +31,14 @@ where
     fn entry(&self) {
         match self {
             Vertex::State(s) => s.entry(),
-            Vertex::SubMachineState(sm) => sm.entry(),
+            Vertex::SubMachineState { handler, sm: _ } => handler.entry(),
             Vertex::PseudoState(ps) => ps.entry(),
         }
     }
     fn exit(&self) {
         match self {
             Vertex::State(s) => s.exit(),
-            Vertex::SubMachineState(sm) => sm.exit(),
+            Vertex::SubMachineState { handler, sm: _ } => handler.exit(),
             Vertex::PseudoState(ps) => ps.exit(),
         }
     }
@@ -43,7 +46,7 @@ where
     fn get_data(&mut self) -> Box<DynData> {
         match self {
             Vertex::State(s) => s.get_data(),
-            Vertex::SubMachineState(_) => unreachable!(),
+            Vertex::SubMachineState { handler: _, sm: _ } => unreachable!(),
             Vertex::PseudoState(ps) => ps.get_data(),
         }
     }
@@ -51,7 +54,7 @@ where
     fn get_data_as_ref(&self) -> &DynData {
         match self {
             Vertex::State(s) => s.get_data_as_ref(),
-            Vertex::SubMachineState(_) => unreachable!(),
+            Vertex::SubMachineState { handler: _, sm: _ } => unreachable!(),
             Vertex::PseudoState(ps) => ps.get_data_as_ref(),
         }
     }
@@ -59,7 +62,7 @@ where
     fn set_data(&mut self, data: Box<DynData>) {
         match self {
             Vertex::State(s) => s.set_data(data),
-            Vertex::SubMachineState(_) => unreachable!(),
+            Vertex::SubMachineState { handler: _, sm: _ } => unreachable!(),
             Vertex::PseudoState(ps) => ps.set_data(data),
         }
     }
@@ -67,7 +70,7 @@ where
     fn data_tid(&self) -> TypeId {
         match self {
             Vertex::State(s) => s.data_tid(),
-            Vertex::SubMachineState(sm) => unreachable!(),
+            Vertex::SubMachineState { handler, sm: _ } => handler.data_tid(),
             Vertex::PseudoState(ps) => ps.data_tid(),
         }
     }

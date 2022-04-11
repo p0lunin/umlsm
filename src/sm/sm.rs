@@ -71,6 +71,18 @@ where
             None => return Err(SmError::NoTransitionsFromThisVertex(event)),
         };
         let mut event = event;
+        match state {
+            Vertex::SubMachineState { handler: _, sm } => {
+                let res = sm.process_boxed(event);
+                match res {
+                    Ok(()) => { return Ok(()) }
+                    Err(e) => {
+                        event = e.deconstruct();
+                    }
+                }
+            }
+            Vertex::State(_) | Vertex::PseudoState(_) => {},
+        }
         for transition in transitions {
             match transition.transition(state, event) {
                 Ok(TransitionOut { state: new_state }) => {
@@ -125,4 +137,13 @@ where
 pub enum SmError<Event> {
     NoTransitionsFromThisVertex(Event),
     NoTransitionSatisfyingEvent(Event),
+}
+
+impl<Event> SmError<Event> {
+    pub fn deconstruct(self) -> Event {
+        match self {
+            SmError::NoTransitionSatisfyingEvent(e) => e,
+            SmError::NoTransitionsFromThisVertex(e) => e,
+        }
+    }
 }
