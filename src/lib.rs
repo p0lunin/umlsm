@@ -1,12 +1,8 @@
-pub use event::{EnterSmEvent, Event};
-pub use sm::{Sm, SmBuilder, SmError};
-
-mod event;
-pub mod guard;
-mod macros;
-mod sm;
-pub mod state;
-pub mod transition;
+//pub mod guard;
+//pub mod transition;
+mod stenum;
+mod transitions;
+pub use transitions::TransitionError;
 /*
 #[cfg(test)]
 mod tests {
