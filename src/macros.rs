@@ -2,23 +2,104 @@
 macro_rules! events {
     (
         $( #[ $($meta:tt)+ ] )*
-        {
-            $it:item
-            $($rest:item)*
+        $v:vis enum $enum_name:ident {
+            $($it:tt)*
         }
     ) => {
-        $( #[ $($meta)+ ] )*
-        $it
-
         events! {
+            @inner
             $( #[ $($meta)+ ] )*
-            {
-                $($rest)*
+            $v enum $enum_name {
+                $($it)*
             }
+            []
         }
     };
 
-    ( $( #[ $($meta:tt)+ ] )* {}) => {};
+    (
+        @inner
+        $( #[ $($meta:tt)+ ] )*
+        $ve:vis enum $enum_name:ident {
+            $( #[ $($meta2:tt)+ ] )*
+            $vs:vis struct $it_name:ident;
+            $($rest:tt)*
+        }
+        [$($names:ident),*]
+    ) => {
+        $( #[ $($meta)+ ] )*
+        $( #[ $($meta2)+ ] )*
+        $vs struct $it_name;
+
+        events! {
+            @inner
+            $( #[ $($meta)+ ] )*
+            $ve enum $enum_name {
+                $($rest)*
+            }
+            [$($names,)* $it_name]
+        }
+    };
+
+    (
+        @inner
+        $( #[ $($meta:tt)+ ] )*
+        $ve:vis enum $enum_name:ident {
+            $( #[ $($meta2:tt)+ ] )*
+            $vs:vis struct $it_name:ident ( $($it_ty:ty),*);
+            $($rest:tt)*
+        }
+        [$($names:ident),*]
+    ) => {
+        $( #[ $($meta)+ ] )*
+        $( #[ $($meta2)+ ] )*
+        $vs struct $it_name ($($it_ty),*);
+
+        events! {
+            @inner
+            $( #[ $($meta)+ ] )*
+            $ve enum $enum_name {
+                $($rest)*
+            }
+            [$($names,)* $it_name]
+        }
+    };
+
+    (
+        @inner
+        $( #[ $($meta:tt)+ ] )*
+        $ve:vis enum $enum_name:ident {
+            $( #[ $($meta2:tt)+ ] )*
+            $vs:vis struct $it_name:ident { $($it_fname:ident : $it_fty:ty),* }
+            $($rest:tt)*
+        }
+        [$($names:ident),*]
+    ) => {
+        $( #[ $($meta)+ ] )*
+        $( #[ $($meta2)+ ] )*
+        $vs struct $it_name { $($it_fname : $it_fty),* }
+
+        events! {
+            @inner
+            $( #[ $($meta)+ ] )*
+            $ve enum $enum_name {
+                $($rest)*
+            }
+            [$($names,)* $it_name]
+        }
+    };
+
+    (
+        @inner
+        $( #[ $($meta:tt)+ ] )*
+        $ve:vis enum $enum_name:ident {}
+        [$($name:ident),+]
+    ) => {
+        $ve enum $enum_name {
+            $(
+                $name($name),
+            )+
+        }
+    };
 }
 
 #[macro_export]
@@ -93,15 +174,16 @@ mod compile_tests {
     use super::*;
 
     events! {
-        #[derive(Debug, PartialEq)]
+        #[derive(Debug)]
         #[repr(C)]
-        {
-            struct Foo;
-            struct Bar;
-            struct Baz;
+        enum Event {
+            #[derive(Clone)]
+            struct Event1(String);
+            struct Event2 { field: u64 }
+            struct Event3;
         }
     }
-
+/*
     states! {
         pub trait DynState1;
         {
@@ -123,4 +205,5 @@ mod compile_tests {
             struct State3;
         }
     }
+*/
 }

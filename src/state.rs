@@ -1,5 +1,12 @@
-use crate::vertex::{StateTrait, Vertex};
+use crate::vertex::{Vertex};
 use std::any::{Any, TypeId};
+use crate::{Event, SmError};
+
+pub type State = Box<dyn StateTrait>;
+
+pub trait StateTrait {
+    fn transition(&self, event: Event) -> Result<(), SmError<Event>>;
+}
 
 pub trait Cast<From: 'static>: Any {
     fn upcast(from: Box<From>) -> Box<Self>;
@@ -45,106 +52,22 @@ impl<T: Any> Cast<T> for dyn Any {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub struct InitialPseudoState;
-
-pub struct SimpleVertex<T> {
-    data: Option<Box<T>>,
-    entry: Box<dyn for<'a> Fn(&'a T)>,
-    exit: Box<dyn for<'a> Fn(&'a T)>,
+pub struct SimpleVertex<State> {
+    data: Option<Box<State>>,
+    tid: TypeId,
 }
 
-fn do_nothing<T>(_: &T) {}
-
-impl<T: 'static> SimpleVertex<T> {
-    pub fn new() -> SimpleVertex<T> {
+impl<State> SimpleVertex<State> {
+    pub fn new<T: 'static>() -> SimpleVertex<State> {
         SimpleVertex {
             data: None,
-            entry: Box::new(do_nothing),
-            exit: Box::new(do_nothing),
+            tid: TypeId::of::<T>()
         }
     }
-
-    pub fn with_data(data: T) -> SimpleVertex<T> {
+    pub fn with_data<T: 'static>(data: Box<State>) -> SimpleVertex<State> {
         SimpleVertex {
-            data: Some(Box::new(data)),
-            entry: Box::new(do_nothing),
-            exit: Box::new(do_nothing),
+            data: Some(data),
+            tid: TypeId::of::<T>()
         }
-    }
-
-    pub fn get_data_as_mut_concrete(&mut self) -> &mut T {
-        self.data
-            .as_mut()
-            .expect("Should be guaranteed by the caller.")
-    }
-}
-
-impl<T> SimpleVertex<T> {
-    pub fn with_entry(self, entry: impl for<'a> Fn(&'a T) + 'static) -> SimpleVertex<T> {
-        SimpleVertex {
-            entry: Box::new(entry),
-            ..self
-        }
-    }
-}
-
-impl<T> SimpleVertex<T> {
-    pub fn with_exit(self, exit: impl for<'a> Fn(&'a T) + 'static) -> SimpleVertex<T> {
-        SimpleVertex {
-            exit: Box::new(exit),
-            ..self
-        }
-    }
-}
-
-impl<T: 'static> SimpleVertex<T> {
-    pub fn to_vertex<DynData: Cast<T> + ?Sized>(self) -> Vertex<DynData> {
-        Vertex::State(Box::new(self))
-    }
-}
-
-impl<T, DynData> StateTrait<DynData> for SimpleVertex<T>
-where
-    T: 'static,
-    DynData: Cast<T> + ?Sized,
-{
-    fn entry(&self) {
-        (self.entry)(
-            &self
-                .data
-                .as_ref()
-                .expect("It must be guaranteed by the caller")
-                .as_ref(),
-        );
-    }
-    fn exit(&self) {
-        (self.exit)(
-            &self
-                .data
-                .as_ref()
-                .expect("It must be guaranteed by the caller")
-                .as_ref(),
-        );
-    }
-    fn get_data(&mut self) -> Box<DynData> {
-        self.data
-            .take()
-            .map(|x| DynData::upcast(x))
-            .expect("This method must be called only once.")
-    }
-
-    fn get_data_as_ref(&self) -> &DynData {
-        self.data
-            .as_ref()
-            .map(|x| DynData::upcast_ref(x))
-            .expect("This method must be called only once.")
-    }
-
-    fn set_data(&mut self, data: Box<DynData>) {
-        self.data = Some(data.downcast())
-    }
-    fn data_tid(&self) -> TypeId {
-        TypeId::of::<T>()
     }
 }

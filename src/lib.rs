@@ -1,6 +1,5 @@
 pub use event::{EnterSmEvent, Event};
 pub use sm::{Sm, SmBuilder, SmError};
-pub use vertex::Vertex;
 
 mod event;
 pub mod guard;
@@ -8,8 +7,7 @@ mod macros;
 mod sm;
 pub mod state;
 pub mod transition;
-mod vertex;
-
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -83,3 +81,52 @@ mod tests {
         }
     }
 }
+
+// MVP
+
+events! {
+    #[derive(Debug)]
+    enum Event {
+        struct Event1(String);
+        struct Event2 { field: u64 }
+        struct Event3;
+    }
+}
+
+
+states! {
+    #[derive(Debug, Clone)]
+    enum TopLevelState {
+        struct State1;
+        struct State2(String);
+        struct State3 { s: String, u: u64 }
+        enum SubState;
+    }
+}
+states! {
+    #[derive(Debug, Clone)]
+    enum SubState {
+        struct SubState1;
+        struct SubState2(String);
+        struct SubState3 { field: u64 };
+    }
+}
+
+transitions! {
+    match TopLevelState {
+        State1 => {
+            Event1(str) -> State2(str);
+            Event2 { field: uint } -> State3 { s: String::new(), u: uint };
+        }
+        State2(str) => {
+            Event2 { field: uint } -> State3 { s: str, u: uint };
+        }
+        State3 { s, u } => {}
+        State4() {
+            Var1 => {}
+            Var2(str) => {}
+            Var3 { field } => {}
+        }
+    }
+}
+*/

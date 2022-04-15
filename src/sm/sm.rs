@@ -1,54 +1,37 @@
 use crate::event::{EnterSmEvent, Event};
-use crate::state::Cast;
+use crate::state::{Cast, SimpleVertex, StateTrait};
 use crate::transition::{Transition, TransitionError, TransitionErrorKind, TransitionOut};
 use crate::vertex::{PseudoStateKind, StateTrait, Vertex};
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 
-pub struct Sm<DynData: ?Sized = dyn Any> {
+pub struct Sm<State: ?Sized = dyn StateTrait> {
     state: usize,
-    vertexes: Vec<Vertex<DynData>>,
-    transitions: HashMap<TypeId, Vec<Box<dyn Transition<DynData>>>>,
+    vertexes: Vec<SimpleVertex<State>>,
 }
 
-impl<DynData: ?Sized> Debug for Sm<DynData> {
+impl<State: ?Sized> Debug for Sm<State> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Sm").finish()
     }
 }
 
-impl<DynData> Sm<DynData>
+impl<State> Sm<State>
 where
-    DynData: Cast<Sm<DynData>> + ?Sized + 'static,
+    State: ?Sized + 'static,
 {
     /// Creates a new state machine.
     ///
     /// Note that first vertex in the list must be default, otherwise behaviour is unspecified.
     /// Probably sm will fail on first `sm.process()` call.
     pub fn new(
-        vertexes: Vec<Vertex<DynData>>,
-        transitions: HashMap<TypeId, Vec<Box<dyn Transition<DynData>>>>,
-    ) -> Result<Self, SmError<EnterSmEvent>> {
-        let mut this = Sm {
+        vertexes: Vec<SimpleVertex<State>>,
+    ) -> Self {
+        Sm {
             state: 0,
             vertexes,
-            transitions,
-        };
-        this.init()?;
-        Ok(this)
-    }
-
-    /// Init state machine state.
-    pub fn init(&mut self) -> Result<(), SmError<EnterSmEvent>> {
-        assert_eq!(self.state, 0);
-        self.process(EnterSmEvent)
-    }
-
-    /// Drop current state and revert StateMachine to the pre-initial uninitialized state.
-    pub fn drop_state(&mut self) -> Result<(), SmError<EnterSmEvent>> {
-        assert_eq!(self.state, 0);
-        self.process(EnterSmEvent)
+        }
     }
 
     pub fn process<E: Any + 'static>(&mut self, event: E) -> Result<(), SmError<E>> {
