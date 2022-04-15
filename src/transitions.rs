@@ -136,11 +136,13 @@ mod compile_tests {
 
         #[test]
         fn test_transitions_1() {
-            let state1 = State::State1(State1);
-            let state2 = state1.transition(Event::Event1(Event1)).unwrap();
-            assert_eq!(state2, State::State2(State2));
-            let state3 = state2.transition(Event::Event2(Event2)).unwrap();
-            assert_eq!(state3, State::State3(State3));
+            let state1: State = State1.into();
+            let state2 = state1.transition(Event1.into()).unwrap();
+            assert_eq!(state2, State2.into());
+            let state3 = state2.transition(Event2.into()).unwrap();
+            assert_eq!(state3, State3.into());
+            let err = state3.transition(Event1.into());
+            assert_eq!(err, Err(TransitionError::NoTransition(State3.into(), Event1.into())));
         }
     }
 

@@ -6,7 +6,7 @@ macro_rules! stenum {
             $($it:tt)*
         }
     ) => {
-        stenum! {
+        $crate::stenum! {
             @inner
             $( #[ $($meta)+ ] )*
             $v enum $enum_name {
@@ -30,7 +30,7 @@ macro_rules! stenum {
         $( #[ $($meta2)+ ] )*
         $vs struct $it_name;
 
-        stenum! {
+        $crate::stenum! {
             @inner
             $( #[ $($meta)+ ] )*
             $ve enum $enum_name {
@@ -38,6 +38,7 @@ macro_rules! stenum {
             }
             [$($names,)* $it_name]
         }
+        $crate::stenum! { @impl_into $enum_name $it_name }
     };
 
     (
@@ -54,7 +55,7 @@ macro_rules! stenum {
         $( #[ $($meta2)+ ] )*
         $vs struct $it_name ($($it_ty),*);
 
-        stenum! {
+        $crate::stenum! {
             @inner
             $( #[ $($meta)+ ] )*
             $ve enum $enum_name {
@@ -62,6 +63,7 @@ macro_rules! stenum {
             }
             [$($names,)* $it_name]
         }
+        $crate::stenum! { @impl_into $enum_name $it_name }
     };
 
     (
@@ -78,7 +80,7 @@ macro_rules! stenum {
         $( #[ $($meta2)+ ] )*
         $vs struct $it_name { $($it_fname : $it_fty),* }
 
-        stenum! {
+        $crate::stenum! {
             @inner
             $( #[ $($meta)+ ] )*
             $ve enum $enum_name {
@@ -86,6 +88,7 @@ macro_rules! stenum {
             }
             [$($names,)* $it_name]
         }
+        $crate::stenum! { @impl_into $enum_name $it_name }
     };
 
     (
@@ -99,6 +102,18 @@ macro_rules! stenum {
             $(
                 $name($name),
             )+
+        }
+    };
+
+    (
+        @impl_into
+        $enum_name:ident
+        $struct_name:ident
+    ) => {
+        impl Into<$enum_name> for $struct_name {
+            fn into(self) -> $enum_name {
+                $enum_name::$struct_name(self)
+            }
         }
     };
 }
