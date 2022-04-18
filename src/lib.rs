@@ -2,7 +2,10 @@
 //pub mod transition;
 mod stenum;
 mod transitions;
-pub use transitions::TransitionError;
+mod transition;
+
+pub use transition::{Transition, TransitionError};
+
 /*
 #[cfg(test)]
 mod tests {

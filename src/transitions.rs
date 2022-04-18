@@ -31,9 +31,10 @@ macro_rules! transitions {
         }
         [$($idents:ident),*]
     ) => {
-        impl $state_v {
+        impl $crate::Transition<$event> for $state_v {
+            type State = $state;
             #[allow(unreachable_patterns)]
-            pub fn transition(self, event: $event) -> Result<$state, $crate::TransitionError<$state, $event>> {
+            fn transition(self, event: $event) -> Result<$state, $crate::TransitionError<$state, $event>> {
                 $crate::transitions! {
                     @event_matching
                     $event,
@@ -67,9 +68,10 @@ macro_rules! transitions {
         }
         [$($idents:ident),*]
     ) => {
-        impl $state_v {
+        impl $crate::Transition<$event> for $state_v {
+            type State = $state;
             #[allow(unreachable_patterns)]
-            pub fn transition(self, event: $event) -> Result<$state, $crate::TransitionError<$state, $event>> {
+            fn transition(self, event: $event) -> Result<$state, $crate::TransitionError<$state, $event>> {
                 let $state_v( $($spt)* ) = self;
                 $crate::transitions! {
                     @event_matching
@@ -100,14 +102,20 @@ macro_rules! transitions {
         [$($id:ident),*]
     ) => {
         impl $state {
-            #[allow(unreachable_patterns)]
             pub fn transition(self, event: impl Into<$event>) -> Result<$state, $crate::TransitionError<$state, $event>> {
                 let event = event.into();
+                $crate::Transition::transition(self, event)
+            }
+        }
+        impl $crate::Transition<$event> for $state {
+            type State = $state;
+            #[allow(unreachable_patterns)]
+            fn transition(self, event: $event) -> Result<$state, $crate::TransitionError<$state, $event>> {
                 match self {
                     $(
                         $state::$id(state) => state.transition(event),
                     )*
-                    _ => Err(TransitionError::NoTransition(self, event))
+                    _ => Err($crate::TransitionError::NoTransition(self, event))
                 }
             }
         }
@@ -166,13 +174,8 @@ macro_rules! transitions {
         $this:expr,
         match $event_id:ident {}
     ) => {
-        Err(TransitionError::NoTransition($this.into(), $event_id))
+        Err($crate::TransitionError::NoTransition($this.into(), $event_id))
     };
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum TransitionError<State, Event> {
-    NoTransition(State, Event),
 }
 
 /*
@@ -197,11 +200,8 @@ transitions! {
 
 #[cfg(test)]
 mod compile_tests {
-    use crate::stenum;
-    use super::*;
-
     mod test1 {
-        use super::*;
+        use crate::{stenum, TransitionError};
 
         stenum! {
             #[derive(Debug, PartialEq)]
@@ -248,7 +248,7 @@ mod compile_tests {
     }
 
     mod test2 {
-        use super::*;
+        use crate::{stenum, TransitionError};
 
         stenum! {
             #[derive(Debug, PartialEq)]
