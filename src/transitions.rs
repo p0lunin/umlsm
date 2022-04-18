@@ -101,7 +101,8 @@ macro_rules! transitions {
     ) => {
         impl $state {
             #[allow(unreachable_patterns)]
-            pub fn transition(self, event: $event) -> Result<$state, $crate::TransitionError<$state, $event>> {
+            pub fn transition(self, event: impl Into<$event>) -> Result<$state, $crate::TransitionError<$state, $event>> {
+                let event = event.into();
                 match self {
                     $(
                         $state::$id(state) => state.transition(event),
@@ -237,11 +238,11 @@ mod compile_tests {
         #[test]
         fn test_transitions_1() {
             let state1: State = State1.into();
-            let state2 = state1.transition(Event1.into()).unwrap();
+            let state2 = state1.transition(Event1).unwrap();
             assert_eq!(state2, State2.into());
-            let state3 = state2.transition(Event2.into()).unwrap();
+            let state3 = state2.transition(Event2).unwrap();
             assert_eq!(state3, State3.into());
-            let err = state3.transition(Event1.into());
+            let err = state3.transition(Event1);
             assert_eq!(err, Err(TransitionError::NoTransition(State3.into(), Event1.into())));
         }
     }
@@ -285,13 +286,13 @@ mod compile_tests {
         fn test_transitions_2() {
             let state1: State = State1.into();
 
-            let state2 = state1.transition(Event1("test".into()).into()).unwrap();
+            let state2 = state1.transition(Event1("test".into())).unwrap();
             assert_eq!(state2, State2("test".into()).into());
 
-            let state3 = state2.transition(Event2.into()).unwrap();
+            let state3 = state2.transition(Event2).unwrap();
             assert_eq!(state3, State3("test".into()).into());
 
-            let err = state3.transition(Event2.into());
+            let err = state3.transition(Event2);
             assert_eq!(err, Err(TransitionError::NoTransition(State3("test".into()).into(), Event2.into())));
         }
     }
