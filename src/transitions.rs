@@ -1,5 +1,6 @@
 #[macro_export]
 macro_rules! transitions {
+    // ------------OUTER------------
     (
         event : $event:ident;
         match $state:ident {
@@ -16,12 +17,15 @@ macro_rules! transitions {
         }
     };
 
+    // ------------INNER------------
+
+    // ------------IMPL TRANSITION EMPTY STATE------------
     (
         @inner
         event : $event:ident;
         match $state:ident {
             $state_v:ident => match event {
-                $($pe:ident => $out:ident;)*
+                $($t:tt)*
             }
             $($tokens1:tt)*
         }
@@ -30,11 +34,13 @@ macro_rules! transitions {
         impl $state_v {
             #[allow(unreachable_patterns)]
             pub fn transition(self, event: $event) -> Result<$state, $crate::TransitionError<$state, $event>> {
-                match event {
-                    $(
-                        $event::$pe(_) => Ok($state::$out($out)),
-                    )*
-                    _ => Err(TransitionError::NoTransition($state::$state_v(self), event))
+                $crate::transitions! {
+                    @event_matching
+                    $event,
+                    self,
+                    match event {
+                        $($t)*
+                    }
                 }
             }
         }
@@ -49,6 +55,44 @@ macro_rules! transitions {
         }
     };
 
+    // ------------IMPL TRANSITION TUPLE STATE------------
+    (
+        @inner
+        event : $event:ident;
+        match $state:ident {
+            $state_v:ident( $($spt:tt)* ) => match event {
+                $($t:tt)*
+            }
+            $($tokens1:tt)*
+        }
+        [$($idents:ident),*]
+    ) => {
+        impl $state_v {
+            #[allow(unreachable_patterns)]
+            pub fn transition(self, event: $event) -> Result<$state, $crate::TransitionError<$state, $event>> {
+                let $state_v( $($spt)* ) = self;
+                $crate::transitions! {
+                    @event_matching
+                    $event,
+                    $state::$state_v($state_v( $($spt)* )),
+                    match event {
+                        $($t)*
+                    }
+                }
+            }
+        }
+
+        $crate::transitions! {
+            @inner
+            event : $event;
+            match $state {
+                $($tokens1)*
+            }
+            [$($idents,)* $state_v]
+        }
+    };
+
+    // ------------IMPL TRANSITION ENUM------------
     (
         @inner
         event : $event:ident;
@@ -66,6 +110,62 @@ macro_rules! transitions {
                 }
             }
         }
+    };
+
+    // ------------IMPL MATCHING EMPTY EVENT------------
+    (
+        @event_matching
+        $event:ident,
+        $this:expr,
+        match $event_id:ident {
+            $pe:ident => $out:expr;
+            $($t:tt)*
+        }
+    ) => {
+        match $event_id {
+            $event::$pe(_) => Ok($out.into()),
+            _ => $crate::transitions! {
+                @event_matching
+                $event,
+                $this,
+                match $event_id {
+                    $($t)*
+                }
+            }
+        }
+    };
+
+    // ------------IMPL MATCHING TUPLE EVENT------------
+    (
+        @event_matching
+        $event:ident,
+        $this:expr,
+        match $event_id:ident {
+            $pe:ident( $($fpats:tt)* ) => $out:expr;
+            $($t:tt)*
+        }
+    ) => {
+        match $event_id {
+            $event::$pe( $pe( $($fpats)* ) ) => Ok($out.into()),
+            _ => $crate::transitions! {
+                @event_matching
+                $event,
+                $this,
+                match $event_id {
+                    $($t)*
+                }
+            }
+        }
+    };
+
+    // ------------IMPL MATCHING NO TRANSITION------------
+    (
+        @event_matching
+        $event:ident,
+        $this:expr,
+        match $event_id:ident {}
+    ) => {
+        Err(TransitionError::NoTransition($this.into(), $event_id))
     };
 }
 
@@ -143,6 +243,56 @@ mod compile_tests {
             assert_eq!(state3, State3.into());
             let err = state3.transition(Event1.into());
             assert_eq!(err, Err(TransitionError::NoTransition(State3.into(), Event1.into())));
+        }
+    }
+
+    mod test2 {
+        use super::*;
+
+        stenum! {
+            #[derive(Debug, PartialEq)]
+            enum Event {
+                struct Event1(String);
+                struct Event2;
+            }
+        }
+
+        stenum! {
+            #[derive(Debug, PartialEq)]
+            enum State {
+                struct State1;
+                struct State2(String);
+                struct State3(String);
+            }
+        }
+
+        transitions! {
+            event : Event;
+
+            match State {
+                State1 => match event {
+                    Event1(s) => State2(s);
+                    Event2 => State3(String::new());
+                }
+                State2(s) => match event {
+                    Event2 => State3(s);
+                }
+                State3 => match event {}
+            }
+        }
+
+        #[test]
+        fn test_transitions_2() {
+            let state1: State = State1.into();
+
+            let state2 = state1.transition(Event1("test".into()).into()).unwrap();
+            assert_eq!(state2, State2("test".into()).into());
+
+            let state3 = state2.transition(Event2.into()).unwrap();
+            assert_eq!(state3, State3("test".into()).into());
+
+            let err = state3.transition(Event2.into());
+            assert_eq!(err, Err(TransitionError::NoTransition(State3("test".into()).into(), Event2.into())));
         }
     }
 
