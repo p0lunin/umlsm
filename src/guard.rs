@@ -1,8 +1,6 @@
-use crate::event::Event;
 use crate::transition::{
     EmptyTransition, Transition, TransitionError, TransitionErrorKind, TransitionOut,
 };
-use crate::Vertex;
 use std::any::{Any, TypeId};
 
 pub trait Guard<Event> {
