@@ -13,6 +13,7 @@ macro_rules! stenum {
                 $($it)*
             }
             []
+            impl_for: [$enum_name,]
         }
     };
 
@@ -25,6 +26,7 @@ macro_rules! stenum {
             $($rest:tt)*
         }
         [$($names:ident),*]
+        impl_for: [$($impl_for:ident,)+]
     ) => {
         $( #[ $($meta)+ ] )*
         $( #[ $($meta2)+ ] )*
@@ -37,8 +39,9 @@ macro_rules! stenum {
                 $($rest)*
             }
             [$($names,)* $it_name]
+            impl_for: [$($impl_for,)+]
         }
-        $crate::stenum! { @impl_into $enum_name $it_name }
+        $crate::stenum! { @impl_into [$($impl_for,)+] $it_name }
     };
 
     (
@@ -50,6 +53,7 @@ macro_rules! stenum {
             $($rest:tt)*
         }
         [$($names:ident),*]
+        impl_for: [$($impl_for:ident,)+]
     ) => {
         $( #[ $($meta)+ ] )*
         $( #[ $($meta2)+ ] )*
@@ -62,8 +66,42 @@ macro_rules! stenum {
                 $($rest)*
             }
             [$($names,)* $it_name]
+            impl_for: [$($impl_for,)+]
         }
-        $crate::stenum! { @impl_into $enum_name $it_name }
+        $crate::stenum! { @impl_into [$($impl_for,)+] $it_name }
+    };
+
+    // ------------IMPL REGION------------
+    (
+        @inner
+        $( #[ $($meta:tt)+ ] )*
+        $ve:vis enum $enum_name:ident {
+            $( #[ $($meta2:tt)+ ] )*
+            $vs:vis region $it_name:ident { $($rt:tt)* }
+            $($rest:tt)*
+        }
+        [$($names:ident),*]
+        impl_for: [$($impl_for:ident,)+]
+    ) => {
+        $crate::stenum! {
+            @inner
+            $( #[ $($meta2)+ ] )*
+            $vs enum $it_name {
+                $($rt)*
+            }
+            []
+            impl_for: [$it_name, $($impl_for,)+]
+        }
+        $crate::stenum! {
+            @inner
+            $( #[ $($meta)+ ] )*
+            $ve enum $enum_name {
+                $($rest)*
+            }
+            [$($names,)* $it_name]
+            impl_for: [$($impl_for,)+]
+        }
+        $crate::stenum! { @impl_into [$($impl_for,)+] $it_name }
     };
 
     (
@@ -75,6 +113,7 @@ macro_rules! stenum {
             $($rest:tt)*
         }
         [$($names:ident),*]
+        impl_for: [$($impl_for:ident,)+]
     ) => {
         $( #[ $($meta)+ ] )*
         $( #[ $($meta2)+ ] )*
@@ -87,8 +126,9 @@ macro_rules! stenum {
                 $($rest)*
             }
             [$($names,)* $it_name]
+            impl_for: [$($impl_for,)+]
         }
-        $crate::stenum! { @impl_into $enum_name $it_name }
+        $crate::stenum! { @impl_into [$($impl_for,)+] $it_name }
     };
 
     (
@@ -96,6 +136,7 @@ macro_rules! stenum {
         $( #[ $($meta:tt)+ ] )*
         $ve:vis enum $enum_name:ident {}
         [$($name:ident),+]
+        impl_for: [$($impl_for:ident,)+]
     ) => {
         $( #[ $($meta)+ ] )*
         $ve enum $enum_name {
@@ -107,7 +148,7 @@ macro_rules! stenum {
 
     (
         @impl_into
-        $enum_name:ident
+        [$enum_name:ident, $($idents:ident,)*]
         $struct_name:ident
     ) => {
         impl Into<$enum_name> for $struct_name {
@@ -115,7 +156,41 @@ macro_rules! stenum {
                 $enum_name::$struct_name(self)
             }
         }
+        $crate::stenum! {
+            @impl_into_expr
+            [$($idents,)*]
+            $enum_name
+            $struct_name
+            (|x| $enum_name::$struct_name(x))
+        }
     };
+    (
+        @impl_into_expr
+        [$enum_name:ident, $($idents:ident,)*]
+        $prev_name:ident
+        $struct_name:ident
+        $into:expr
+    ) => {
+        impl Into<$enum_name> for $struct_name {
+            fn into(self) -> $enum_name {
+                $enum_name::$prev_name(($into)(self))
+            }
+        }
+        $crate::stenum! {
+            @impl_into_expr
+            [$($idents,)*]
+            $enum_name
+            $struct_name
+            |x| $enum_name::$struct_name(($into)(x))
+        }
+    };
+    (
+        @impl_into_expr
+        []
+        $prev_name:ident
+        $struct_name:ident
+        $into:expr
+    ) => {};
 }
 
 #[cfg(test)]
@@ -129,6 +204,19 @@ mod compile_tests {
             pub struct Event1(String);
             struct Event2 { field: u64 }
             pub(crate) struct Event3;
+        }
+    }
+
+    stenum! {
+        #[derive(Debug, PartialEq, Clone)]
+        enum State {
+            struct State1;
+
+            #[derive(Debug, PartialEq, Clone)]
+            region InnerState {
+                struct InnerState1;
+                struct InnerState2;
+            }
         }
     }
 }
